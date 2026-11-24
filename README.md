@@ -17,7 +17,9 @@ Alle Cues einer Show in einer App: **Timer, PowerPoint/PDF-Folien mit Videoclips
 | Stage-Monitor mit Nachrichten an die Bühne | ✓ | ✓ |
 | Dokumente mit weichem Scrollen, Zoom, Teleprompter | ✓ | ✓ |
 | Lyrics (.lrc/.srt synchron, Online-Suche, 30 Stile) | ✓ | ✓ |
+| 4 Medien-Slots für Bilder/Videos (Logo, Pausenbild, Einspieler) | ✓ | ✓ |
 | 4× Desktop-Capture, 4 Mixe à 8 Ebenen | ✓ | ✓ |
+| **Mix-Szenen**: Abläufe wie Bild → PowerPoint → Bild → PDF, per GO, Clicker oder Companion | ✓ | ✓ |
 | Ausgänge als Fenster / Vollbild, Testbild, Chroma-Hintergrund | ✓ | ✓ (Vollbild automatisch) |
 | **NDI-Ausgabe** inkl. Alpha-Transparenz | – | ✓ |
 | **Bitfocus Companion / HTTP-Fernsteuerung**, Handy-Fernbedienung | – | ✓ |
@@ -45,7 +47,8 @@ Modul **Generic HTTP** anlegen, Basis-URL `http://<IP-des-CueStack-Rechners>:987
 | `timer/set?t=10:00` oder `timer/set?sec=600`, `timer/add?sec=60`, `timer/mode?m=down\|up\|clock` | Timer stellen |
 | `blackout/toggle`, `blackout/on`, `blackout/off` | Blackout |
 | `stage/message?text=Noch%205%20Minuten`, `stage/clear` | Nachricht auf Stage-Monitor |
-| `clicker?target=slides\|doc\|lyrics` | Ziel des Clickers |
+| `mix/next?m=1`, `mix/prev?m=1`, `mix/scene?m=1&s=3`, `mix/step?m=1` | Mix-Szenen schalten (`step` blättert erst durch Folien/Dokument) |
+| `clicker?target=slides\|doc\|lyrics\|mix1` | Ziel des Clickers |
 | `state` | Status als JSON (Timer-Text, Folie, Blackout …) – für Companion-Feedbacks/Variablen |
 
 GET und POST funktionieren beide. Port ändern: Umgebungsvariable `CUESTACK_PORT`. Nur lokal erreichbar machen: `CUESTACK_HOST=127.0.0.1`.

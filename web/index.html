@@ -68,6 +68,14 @@ nav button.isLive .live{display:inline}
 #lyList li button{width:100%;text-align:left;border:0;border-bottom:1px solid var(--ln);border-radius:0;background:transparent;white-space:pre-line;display:flex;gap:10px}
 #lyList li button small{color:var(--mu);font-variant-numeric:tabular-nums;flex:none;width:48px}
 #lyList li.cur button{background:#12392a}
+#scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.scene{display:flex;border:1px solid var(--ln);border-radius:9px;overflow:hidden;background:var(--pn2)}
+.scene.edit{border-color:#5b6475;box-shadow:0 0 0 1px #5b6475}
+.scene.onair{border-color:var(--rd);box-shadow:0 0 0 1px var(--rd)}
+.scene .sname{flex:1;border:0;border-radius:0;background:transparent;text-align:left;display:grid;gap:2px;min-width:0}
+.scene .sname small{color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scene .go{border:0;border-radius:0;border-left:1px solid var(--ln);font-weight:800;min-width:66px}
+.scene.onair .go{background:var(--rd);color:#fff}
 #lyRes{list-style:none;padding:0;margin:8px 0 0;max-height:200px;overflow:auto}
 #lyRes button{width:100%;text-align:left;margin-bottom:4px}
 table{border-collapse:collapse;width:100%}
@@ -100,7 +108,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <label title="Ausgabe-Auflösung">Auflösung
   <select id="res"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K (2160p)</option></select></label>
  <label title="Was steuert der Presenter-Clicker / die Pfeiltasten?">Clicker steuert
-  <select id="clicker"><option value="slides">Folien</option><option value="doc">Dokument</option><option value="lyrics">Lyrics</option></select></label>
+  <select id="clicker"><option value="slides">Folien</option><option value="doc">Dokument</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
  <div class="sp"></div>
  <button id="newShow">Neue Show</button>
  <button id="loadShow">Show öffnen…</button><input type="file" id="loadFile" accept=".cuestack,.json" hidden>
@@ -117,6 +125,11 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <button data-v="lyrics">Lyrics <span class="live">LIVE</span></button>
  <button data-v="presenter">Referentenansicht <span class="live">LIVE</span></button>
  <button data-v="stage">Stage-Monitor <span class="live">LIVE</span></button>
+ <h4>Medien (Bild/Video)</h4>
+ <button data-v="med1">Medien 1 <span class="live">LIVE</span></button>
+ <button data-v="med2">Medien 2 <span class="live">LIVE</span></button>
+ <button data-v="med3">Medien 3 <span class="live">LIVE</span></button>
+ <button data-v="med4">Medien 4 <span class="live">LIVE</span></button>
  <h4>Desktop Capture</h4>
  <button data-v="cap1">Capture 1 <span class="live">LIVE</span></button>
  <button data-v="cap2">Capture 2 <span class="live">LIVE</span></button>
@@ -272,12 +285,37 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
   <p class="hint">Vier unabhängige Slots. Die Steuerung (dieses Fenster) nicht minimieren, sonst pausiert der Browser die Aufnahme.</p>
  </section>
 
+ <!-- MEDIEN -->
+ <section class="panel" id="p-med">
+  <div class="ph"><h2 id="medTitle">Medien</h2><span class="hint" id="medLabel">Leer</span><button class="toOut">Auf Ausgang ▸</button></div>
+  <div class="pv drop" id="pv-med" data-for="med"><div class="empty" id="medEmpty">Bild oder Video hierher ziehen<br>(Logo, Pausenbild, Sponsor, Einspieler)</div></div>
+  <div class="row">
+   <button id="medOpen" class="pri big">Datei öffnen…</button><input type="file" id="medFile" accept="image/*,video/mp4,video/webm,.mp4,.webm,.m4v,.mov" hidden>
+   <button id="medPlay" class="big">▶ / ❚❚</button><button id="medClear">Leeren</button>
+   <label>Darstellung<select id="medFit"><option value="contain">Einpassen</option><option value="cover">Füllen</option><option value="stretch">Strecken</option></select></label>
+  </div>
+  <div class="row"><label class="ck"><input type="checkbox" id="medLoop" checked> Video wiederholen</label><label class="ck"><input type="checkbox" id="medAudio"> Ton</label>
+   <label class="ck"><input type="checkbox" id="medRestart" checked> Video beim Szenenwechsel von vorn</label></div>
+  <p class="hint">Vier Slots für einzelne Bilder oder Videos – ideal als Ebene in Mix-Szenen.</p>
+ </section>
+
  <!-- MIX -->
  <section class="panel" id="p-mix">
-  <div class="ph"><h2 id="mixTitle">Mix</h2><button id="mixAdd">+ Ebene</button><button class="toOut">Auf Ausgang ▸</button></div>
+  <div class="ph"><h2 id="mixTitle">Mix</h2><button id="scPrev" class="big">◀ Szene</button><button id="scNext" class="big pri">Szene ▶</button><button class="toOut">Auf Ausgang ▸</button></div>
   <div class="pv" id="pv-mix"></div>
-  <div class="box"><table><thead><tr><th>An</th><th>Quelle</th><th>X %</th><th>Y %</th><th>Größe %</th><th>Deckkraft</th><th></th></tr></thead><tbody id="mixRows"></tbody></table>
-  <p class="hint">Bis zu 8 Ebenen, oberste Zeile liegt hinten. Beispiel: Folien auf 100 %, darüber Timer mit X 70, Y 2, Größe 28.</p></div>
+  <div class="box"><h3>Szenen</h3>
+   <div id="scenes"></div>
+   <div class="row">
+    <button id="scAdd">+ Neue Szene</button><button id="scDup">Duplizieren</button><button id="scUp">◀ verschieben</button><button id="scDn">verschieben ▶</button><button id="scDel">Löschen</button>
+    <label style="flex:1">Name<input type="text" id="scName"></label></div>
+   <div class="row">
+    <label>Übergang<select id="scTrans"><option value="cut">Schnitt</option><option value="fade">Überblenden</option></select></label>
+    <label>Dauer (s)<input type="number" id="scDur" min="0.1" max="5" step="0.1" style="width:80px"></label>
+    <label class="ck"><input type="checkbox" id="scSmart"> Clicker blättert erst durch Folien/Dokument der Szene, dann zur nächsten Szene</label></div>
+   <p class="hint">Beispiel: 1. Logo (Medien 1) → 2. Präsentation (Folien) → 3. Pausenbild (Medien 2) → 4. Handout (Dokument). Mit „Clicker steuert: Mix“ läuft alles über den Presenter.</p></div>
+  <div class="box"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h3 id="scEditInfo" style="margin:0">Ebenen</h3><button id="mixAdd">+ Ebene</button></div>
+  <table><thead><tr><th>An</th><th>Quelle</th><th>X %</th><th>Y %</th><th>Größe %</th><th>Deckkraft</th><th></th></tr></thead><tbody id="mixRows"></tbody></table>
+  <p class="hint">Bis zu 8 Ebenen pro Szene, oberste Zeile liegt hinten. Beispiel: Folien auf 100 %, darüber Timer mit X 70, Y 2, Größe 28.</p></div>
  </section>
 </div>
 
@@ -591,12 +629,56 @@ async function capStart(s){if(!navigator.mediaDevices?.getDisplayMedia){toast('B
  }catch(e){if(e.name!=='NotAllowedError')toast('Capture fehlgeschlagen: '+e.message);}}
 function capStop(s,silent){if(s.stream)s.stream.getTracks().forEach(t=>t.stop());if(s.video)s.video.remove();s.stream=s.video=null;s.label='';s.dirty=true;if(!silent)updCapUI();}
 
-/* ---------- MIX ---------- */
-const MIX=[1,2,3,4].map(n=>addSource({id:'mix'+n,type:'mix',name:'Mix '+n,layers:[],draw(){
- const c=this.ctx;c.clearRect(0,0,W,H);for(const l of this.layers){if(!l.on)continue;const s=byId[l.src];if(!s||s.type==='mix')continue;
-  c.globalAlpha=Math.max(0,Math.min(1,l.op/100));c.drawImage(s.canvas,W*l.x/100,H*l.y/100,W*l.sc/100,H*l.sc/100);}c.globalAlpha=1;}}));
+/* ---------- MEDIEN-SLOTS (Bild / Video) ---------- */
+const MED=[1,2,3,4].map(n=>addSource({id:'med'+n,type:'med',name:'Medien '+n,file:null,img:null,video:null,url:'',fit:'contain',loop:true,audio:false,restart:true,
+ draw(){const v=this.video,an=v&&!v.paused;if(!an&&!this.dirty)return;this.dirty=false;const c=this.ctx;c.clearRect(0,0,W,H);
+  const src=v||this.img;if(!src)return;const iw=v?v.videoWidth:src.width,ih=v?v.videoHeight:src.height;if(!iw)return;
+  const[x,y,w,h]=fitRect(iw,ih,W,H,this.fit);try{c.drawImage(src,x,y,w,h);}catch(e){}}}));
+function medClear(s){if(s.video){s.video.pause();s.video.removeAttribute('src');s.video.load();s.video.remove();}if(s.url)URL.revokeObjectURL(s.url);s.img=s.video=null;s.url='';s.file=null;s.dirty=true;}
+async function medLoad(s,f){medClear(s);if(!f)return;
+ try{if(isImg(f)){s.img=await createImageBitmap(new Blob([f.bytes],{type:f.type||'image/png'}));}
+  else if(isVid(f)){s.url=URL.createObjectURL(new Blob([f.bytes],{type:f.type||'video/mp4'}));const v=document.createElement('video');v.src=s.url;v.loop=s.loop;v.muted=!s.audio;v.playsInline=true;
+   $('#vids').appendChild(v);const ok=await new Promise(r=>{v.onloadeddata=()=>r(true);v.onerror=()=>r(false);});if(!ok)throw new Error('Video-Format nicht abspielbar (MP4/H.264 oder WebM)');
+   s.video=v;v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});});}
+  else throw new Error('Bitte ein Bild oder Video wählen.');s.file=f;}
+ catch(e){medClear(s);toast(e.message);}s.dirty=true;updMedUI();saveMedia();}
+function medRestart(id){const s=byId[id];if(s?.video&&s.restart){try{s.video.currentTime=0;}catch(e){}s.video.play().catch(()=>{});}}
+function saveMedia(){idb.set('mediaFiles',MED.map(m=>m.file));saveSoon();}
+function updMedUI(){const s=byId[curView];if(!s||s.type!=='med')return;$('#medTitle').textContent=s.name;$('#medLabel').textContent=s.file?s.file.name:'Leer';
+ $('#medEmpty').style.display=s.file?'none':'';$('#medFit').value=s.fit;$('#medLoop').checked=s.loop;$('#medAudio').checked=s.audio;$('#medRestart').checked=s.restart;
+ $('#medPlay').disabled=!s.video;$('#medClear').disabled=!s.file;}
+
+/* ---------- MIX mit Szenen ---------- */
+const newScene=(name,layers=[])=>({name,layers});
+const tmpA=mk(16,9),tmpB=mk(16,9);
+function drawLayers(c,layers){for(const l of layers){if(!l.on)continue;const s=byId[l.src];if(!s||s.type==='mix')continue;
+ c.globalAlpha=Math.max(0,Math.min(1,l.op/100));c.drawImage(s.canvas,W*l.x/100,H*l.y/100,W*l.sc/100,H*l.sc/100);}c.globalAlpha=1;}
+const MIX=[1,2,3,4].map(n=>addSource({id:'mix'+n,type:'mix',name:'Mix '+n,scenes:[newScene('Szene 1')],act:0,prev:-1,t0:0,edit:0,trans:'fade',dur:.5,smart:true,
+ get layers(){return(this.scenes[this.edit]||this.scenes[0]).layers;},
+ get live(){return(this.scenes[this.act]||this.scenes[0]).layers;},
+ draw(now){const c=this.ctx;c.clearRect(0,0,W,H);const p=this.prev<0||this.trans==='cut'?1:Math.min(1,(now-this.t0)/(this.dur*1000));
+  if(p>=1){this.prev=-1;drawLayers(c,this.live);return;}
+  for(const t of[tmpA,tmpB])if(t.width!==W||t.height!==H){t.width=W;t.height=H;}
+  const a=tmpA.getContext('2d'),b=tmpB.getContext('2d');a.clearRect(0,0,W,H);b.clearRect(0,0,W,H);
+  drawLayers(a,this.scenes[this.prev]?.layers||[]);drawLayers(b,this.live);const e=ease(p);
+  c.globalAlpha=1-e;c.drawImage(tmpA,0,0);c.globalCompositeOperation='lighter';c.globalAlpha=e;c.drawImage(tmpB,0,0);c.globalCompositeOperation='source-over';c.globalAlpha=1;}}));
+function sceneGo(m,i){if(!m.scenes.length)return;i=Math.max(0,Math.min(m.scenes.length-1,i));if(i===m.act&&m.prev<0)return;
+ m.prev=m.act;m.act=i;m.t0=performance.now();m.scenes[i].layers.forEach(l=>{if(l.on&&String(l.src).startsWith('med'))medRestart(l.src);});
+ updLive();if(curView===m.id)renderMix();saveSoon();}
+/* Clicker auf einem Mix: erst durch Folien/Dokument der Szene blättern, dann nächste Szene */
+function mixStep(m,d){const live=m.live.filter(l=>l.on).map(l=>l.src);
+ if(m.smart){if(live.includes('slides')&&S.ps){const t=S.idx+d;if(t>=0&&t<S.ps.n){slideGo(t);return;}}
+  else if(live.includes('doc')&&D.ps){const t=docPage()+d;if(t>=0&&t<D.ps.n){docGoto(t);return;}}}
+ sceneGo(m,m.act+d);}
 const LAYER_SRC=()=>sources.filter(s=>s.type!=='mix');
-function renderMix(){const m=byId[curView];if(!m||m.type!=='mix')return;const tb=$('#mixRows');tb.innerHTML='';
+function renderScenes(m){const box=$('#scenes');box.innerHTML='';
+ m.scenes.forEach((sc,i)=>{const d=document.createElement('div');d.className='scene'+(i===m.act?' onair':'')+(i===m.edit?' edit':'');d.dataset.i=i;
+  const srcs=sc.layers.filter(l=>l.on).map(l=>byId[l.src]?.name||l.src).join(' + ')||'leer';
+  d.innerHTML=`<button class="sname" data-a="edit" title="Zum Bearbeiten wählen"><b></b><small></small></button><button class="go" data-a="go">${i===m.act?'LIVE':'GO ▶'}</button>`;
+  $('b',d).textContent=(i+1)+'. '+sc.name;$('small',d).textContent=srcs;box.appendChild(d);});
+ $('#scName').value=m.scenes[m.edit]?.name||'';$('#scTrans').value=m.trans;$('#scDur').value=m.dur;$('#scSmart').checked=m.smart;
+ $('#scDel').disabled=m.scenes.length<2;$('#scEditInfo').textContent=`Ebenen von „${m.scenes[m.edit]?.name||''}“`+(m.edit===m.act?' (ist LIVE – Änderungen sofort sichtbar)':' (nicht live)');}
+function renderMix(){const m=byId[curView];if(!m||m.type!=='mix')return;renderScenes(m);const tb=$('#mixRows');tb.innerHTML='';
  m.layers.forEach((l,i)=>{const tr=document.createElement('tr');tr.dataset.i=i;
   tr.innerHTML=`<td><input type="checkbox" data-k="on"></td><td><select data-k="src">${LAYER_SRC().map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></td>
   <td><input type="number" data-k="x" step="1"></td><td><input type="number" data-k="y" step="1"></td><td><input type="number" data-k="sc" min="1" step="1"></td><td><input type="number" data-k="op" min="0" max="100" step="5"></td>
@@ -712,7 +794,7 @@ function renderOuts(){const box=$('#outs');box.innerHTML='';$('#noOuts').style.d
   ${NATIVE?`<div class="r"><label class="ck"><input type="checkbox" data-k="ndi"${o.ndi?' checked':''}> NDI senden als</label><input type="text" data-k="ndiName" style="flex:1"></div>`:''}`;
   $('[data-k=bg]',d).value=o.bg;const nn=$('[data-k=ndiName]',d);if(nn)nn.value=o.ndiName;box.appendChild(d);}
  updLive();}
-function updLive(){const live=new Set();const add=id=>{if(live.has(id))return;live.add(id);const s=byId[id];if(s?.type==='mix')s.layers.forEach(l=>l.on&&add(l.src));};
+function updLive(){const live=new Set();const add=id=>{if(live.has(id))return;live.add(id);const s=byId[id];if(s?.type==='mix')s.live.forEach(l=>l.on&&add(l.src));};
  /* Stage zeigt Folien nur als Vorschau – zählt nicht als LIVE */
  outputs.forEach(o=>add(o.src));$$('#nav button').forEach(b=>b.classList.toggle('isLive',live.has(b.dataset.v)));}
 function fillScreens(){const sel=$('#scrSel');sel.innerHTML='<option value="">Neues Fenster</option>'+(screens||[]).map((s,i)=>`<option value="${i}">${(s.label||('Bildschirm '+(i+1))).replace(/[<>&"]/g,'')}${s.isPrimary?' (Haupt)':''} · ${s.width}×${s.height}</option>`).join('');
@@ -723,7 +805,7 @@ async function detectScreens(){if(!('getScreenDetails' in window)){toast('Bildsc
 
 /* ---------- TICK ---------- */
 let lastT=0;
-function deps(s){return s?.type==='mix'?s.layers.filter(l=>l.on).map(l=>l.src):(s?.type==='stage'||s?.type==='presenter')?['slides']:[];}
+function deps(s){return s?.type==='mix'?[...s.live,...(s.prev>=0?(s.scenes[s.prev]?.layers||[]):[]),...(curView===s.id?s.layers:[])].filter(l=>l.on).map(l=>l.src):(s?.type==='stage'||s?.type==='presenter')?['slides']:[];}
 function needed(){const n=new Set();const add=id=>{if(n.has(id))return;n.add(id);deps(byId[id]).forEach(add);};
  outputs.forEach(o=>add(o.src));add(curView);return n;}
 function logic(now){
@@ -744,7 +826,7 @@ function frame(){PV.tick();const now=performance.now();ndiPump(now);
 PV.key=function(e){const k=e.key;
  if(k==='b'||k==='B'||k==='.'){e.preventDefault();setBO(!BO);return;}
  const nx=['ArrowRight','ArrowDown','PageDown',' '].includes(k),pv=['ArrowLeft','ArrowUp','PageUp'].includes(k);if(!nx&&!pv)return;
- e.preventDefault();const d=nx?1:-1;if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else lyStep(d);};
+ e.preventDefault();const d=nx?1:-1;if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
 document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select'))return;if(e.ctrlKey||e.metaKey||e.altKey)return;
  if(e.target.closest('button')&&(e.key===' '||e.key==='Enter'))return;PV.key(e);});
 
@@ -755,7 +837,7 @@ const idb={db:null,open(){return this.db||(this.db=new Promise((res,rej)=>{const
 function snapshot(){return{app:'CueStack',v:1,res:resKey,clicker,T:{...T},
  D:{zoom:D.zoom,fit:D.fit,page:docPage()},S:{idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes},ST:{...ST},PR:{...PR},
  LY:{title:LY.title,lines:LY.lines,synced:LY.synced,idx:LY.idx,style:LY.style,size:LY.size,color:LY.color,offset:LY.offset},
- MIX:MIX.map(m=>m.layers),CAP:CAP.map(c=>c.fit),outs:outputs.map(o=>({src:o.src,bg:o.bg,ndi:o.ndi,win:!!o.win,name:o.ndiName}))};}
+ MIX:MIX.map(m=>({scenes:m.scenes,act:m.act,trans:m.trans,dur:m.dur,smart:m.smart})),MED:MED.map(m=>({fit:m.fit,loop:m.loop,audio:m.audio,restart:m.restart})),CAP:CAP.map(c=>c.fit),outs:outputs.map(o=>({src:o.src,bg:o.bg,ndi:o.ndi,win:!!o.win,name:o.ndiName}))};}
 let saveH=0;function saveSoon(){clearTimeout(saveH);saveH=setTimeout(()=>idb.set('state',snapshot()),600);}
 async function applySnap(j,docFiles,slideFiles){
  if(j.res&&RES[j.res])setRes(j.res);if(j.clicker){clicker=j.clicker;$('#clicker').value=clicker;}
@@ -763,7 +845,9 @@ async function applySnap(j,docFiles,slideFiles){
  if(j.D){D.zoom=j.D.zoom||1;D.fit=j.D.fit||'width';}
  if(j.S)Object.assign(S,j.S,{prev:-1});if(j.ST)Object.assign(ST,j.ST);if(j.PR)Object.assign(PR,j.PR);
  if(j.LY){Object.assign(LY,j.LY,{playing:false,pos:0,blank:false,sb:false});renderLyList();updLyUI();}
- (j.MIX||[]).forEach((l,i)=>{if(MIX[i])MIX[i].layers=l||[];});(j.CAP||[]).forEach((f,i)=>{if(CAP[i])CAP[i].fit=f;});
+ (j.MIX||[]).forEach((v,i)=>{const m=MIX[i];if(!m||!v)return;if(Array.isArray(v)){m.scenes=[newScene('Szene 1',v)];m.act=0;}
+  else{m.scenes=v.scenes?.length?v.scenes:[newScene('Szene 1')];m.act=Math.min(v.act||0,m.scenes.length-1);m.trans=v.trans||'fade';m.dur=v.dur||.5;m.smart=v.smart!==false;}m.edit=m.act;m.prev=-1;});
+ (j.MED||[]).forEach((v,i)=>{if(MED[i]&&v)Object.assign(MED[i],v);});(j.CAP||[]).forEach((f,i)=>{if(CAP[i])CAP[i].fit=f;});
  syncInputs();
  if(docFiles?.length)await setDocFiles(docFiles,j.D?.page||0);
  if(slideFiles?.length)await setSlideFiles(slideFiles,j.S?.idx||0,j.S?.notes);
@@ -771,7 +855,7 @@ async function applySnap(j,docFiles,slideFiles){
 const toB64=buf=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(new Blob([buf]));});
 function fromB64(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
 async function exportShow(){const j=snapshot();const enc=async fs=>Promise.all(fs.map(async f=>({name:f.name,type:f.type,notes:f.notes||null,b64:await toB64(f.bytes)})));
- j.files={doc:await enc(D.files),slides:await enc(S.files)};
+ j.files={doc:await enc(D.files),slides:await enc(S.files),media:await Promise.all(MED.map(async m=>m.file?(await enc([m.file]))[0]:null))};
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(j)],{type:'application/json'}));
  const d=new Date();a.download=`Show_${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.cuestack`;
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Show gespeichert.');}
@@ -780,6 +864,7 @@ async function importShow(file){try{const j=JSON.parse(await file.text());if(j.a
  const df=dec(j.files?.doc),sf=dec(j.files?.slides);
  D.files=[];D.ps=null;S.files=[];S.ps=null;$('#thumbs').innerHTML='';
  const outs=await applySnap(j,df,sf);if(!df.length){idb.set('docFiles',[]);docLayout();}if(!sf.length)idb.set('slideFiles',[]);
+ const mf=j.files?.media||[];for(let i=0;i<MED.length;i++){const f=mf[i];if(f)await medLoad(MED[i],dec([f])[0]);else{medClear(MED[i]);}}saveMedia();
  saveSoon();offerOuts(outs);toast('Show geladen.');}catch(e){toast('Laden fehlgeschlagen: '+e.message);}}
 function offerOuts(outs){outs=outs.filter(o=>!outputs.some(x=>x.src===o.src));if(!outs.length)return;
  $('#restoreTxt').textContent=`${outs.length} Ausgang/Ausgänge aus der Show (${outs.map(o=>byId[o.src]?.name||o.src).join(', ')}).`;
@@ -788,9 +873,9 @@ function offerOuts(outs){outs=outs.filter(o=>!outputs.some(x=>x.src===o.src));if
 /* ---------- UI ---------- */
 function setRes(k){resKey=k;[W,H]=RES[k];for(const s of sources){s.canvas.width=W;s.canvas.height=H;s.dirty=true;s.key='';}docLayout();$('#res').value=k;}
 function show(v){curView=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));const s=byId[v];
- const pid=s.type==='cap'?'cap':s.type==='mix'?'mix':v;$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+pid));
+ const pid=s.type==='cap'?'cap':s.type==='mix'?'mix':s.type==='med'?'med':v;$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+pid));
  const pv=$('#pv-'+pid);pv.querySelectorAll('canvas').forEach(c=>c.remove());pv.prepend(s.canvas);s.dirty=true;
- if(s.type==='cap'){$('#capTitle').textContent=s.name;updCapUI();}if(s.type==='mix'){$('#mixTitle').textContent=s.name;renderMix();}
+ if(s.type==='cap'){$('#capTitle').textContent=s.name;updCapUI();}if(s.type==='mix'){$('#mixTitle').textContent=s.name;renderMix();}if(s.type==='med')updMedUI();
  if(v==='slides')drawNext();}
 function updCapUI(){const s=byId[curView];if(!s||s.type!=='cap')return;$('#capLabel').textContent=s.label||'Keine Quelle';$('#capEmpty').style.display=s.video?'none':'';$('#capFit').value=s.fit;$('#capStop').disabled=!s.video;}
 function syncInputs(){
@@ -859,7 +944,7 @@ $('#slAuto').onchange=e=>{S.auto=e.target.checked;S.lastAuto=Date.now();saveSoon
 $('#slLoop').onchange=e=>{S.loop=e.target.checked;drawNext();saveSoon();};
 /* Drag & Drop */
 for(const z of $$('.drop')){z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag');});z.addEventListener('dragleave',()=>z.classList.remove('drag'));
- z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const f=await readFiles(e.dataTransfer.files,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else setSlideFiles(f);});}
+ z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const f=z.dataset.for==='med'?await Promise.all([...e.dataTransfer.files].slice(0,1).map(async x=>({name:x.name,type:x.type,bytes:await x.arrayBuffer()}))):await readFiles(e.dataTransfer.files,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else if(z.dataset.for==='med'){const s=byId[curView];if(s?.type==='med')medLoad(s,f[0]);}else setSlideFiles(f);});}
 /* Lyrics */
 $('#lySty').innerHTML=LSTY.map((s,i)=>`<option value="${i}">${i+1}. ${s.n}</option>`).join('');
 $('#lySty').onchange=e=>{LY.style=+e.target.value;byId.lyrics.dirty=true;saveSoon();};
@@ -903,17 +988,44 @@ $('#stBlink').onchange=e=>{ST.blink=e.target.checked;saveSoon();};$('#stSl').onc
 $('#capGo').onclick=()=>{const s=byId[curView];if(s?.type==='cap')capStart(s);};
 $('#capStop').onclick=()=>{const s=byId[curView];if(s?.type==='cap')capStop(s);};
 $('#capFit').onchange=e=>{const s=byId[curView];if(s?.type==='cap'){s.fit=e.target.value;saveSoon();}};
+/* Medien */
+const curMed=()=>{const s=byId[curView];return s?.type==='med'?s:null;};
+$('#medOpen').onclick=()=>$('#medFile').click();
+$('#medFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';const s=curMed();if(f&&s)medLoad(s,{name:f.name,type:f.type,bytes:await f.arrayBuffer()});};
+$('#medClear').onclick=()=>{const s=curMed();if(s){medClear(s);updMedUI();saveMedia();}};
+$('#medPlay').onclick=()=>{const s=curMed();if(s?.video){if(s.video.paused){s.video.muted=!s.audio;s.video.play().catch(()=>{});}else s.video.pause();s.dirty=true;}};
+$('#medFit').onchange=e=>{const s=curMed();if(s){s.fit=e.target.value;s.dirty=true;saveSoon();}};
+$('#medLoop').onchange=e=>{const s=curMed();if(s){s.loop=e.target.checked;if(s.video)s.video.loop=s.loop;saveSoon();}};
+$('#medAudio').onchange=e=>{const s=curMed();if(s){s.audio=e.target.checked;if(s.video)s.video.muted=!s.audio;saveSoon();}};
+$('#medRestart').onchange=e=>{const s=curMed();if(s){s.restart=e.target.checked;saveSoon();}};
+/* Mix-Szenen */
+const curMix=()=>{const m=byId[curView];return m?.type==='mix'?m:null;};
+$('#scenes').addEventListener('click',e=>{const b=e.target.closest('button[data-a]'),m=curMix();if(!b||!m)return;const i=+b.closest('.scene').dataset.i;
+ if(b.dataset.a==='go')sceneGo(m,i);else{m.edit=i;renderMix();}});
+$('#scPrev').onclick=()=>{const m=curMix();if(m)sceneGo(m,m.act-1);};$('#scNext').onclick=()=>{const m=curMix();if(m)sceneGo(m,m.act+1);};
+$('#scAdd').onclick=()=>{const m=curMix();if(!m)return;m.scenes.push(newScene('Szene '+(m.scenes.length+1),[{on:true,src:'med1',x:0,y:0,sc:100,op:100}]));m.edit=m.scenes.length-1;renderMix();saveSoon();};
+$('#scDup').onclick=()=>{const m=curMix();if(!m)return;const sc=m.scenes[m.edit];m.scenes.splice(m.edit+1,0,newScene(sc.name+' (Kopie)',JSON.parse(JSON.stringify(sc.layers))));if(m.act>m.edit)m.act++;m.edit++;renderMix();saveSoon();};
+$('#scDel').onclick=()=>{const m=curMix();if(!m||m.scenes.length<2)return;const b=$('#scDel');if(!b.dataset.arm){b.dataset.arm=1;b.textContent='Wirklich löschen?';setTimeout(()=>{delete b.dataset.arm;b.textContent='Löschen';},3000);return;}
+ delete b.dataset.arm;b.textContent='Löschen';const i=m.edit;m.scenes.splice(i,1);if(m.act===i){m.act=Math.min(i,m.scenes.length-1);m.prev=-1;}else if(m.act>i)m.act--;m.edit=Math.min(i,m.scenes.length-1);renderMix();updLive();saveSoon();};
+const scMove=d=>{const m=curMix();if(!m)return;const i=m.edit,j=i+d;if(j<0||j>=m.scenes.length)return;[m.scenes[i],m.scenes[j]]=[m.scenes[j],m.scenes[i]];
+ if(m.act===i)m.act=j;else if(m.act===j)m.act=i;m.edit=j;renderMix();saveSoon();};
+$('#scUp').onclick=()=>scMove(-1);$('#scDn').onclick=()=>scMove(1);
+$('#scName').addEventListener('input',e=>{const m=curMix();if(!m)return;m.scenes[m.edit].name=e.target.value;renderScenes(m);saveSoon();});
+$('#scTrans').onchange=e=>{const m=curMix();if(m){m.trans=e.target.value;saveSoon();}};
+$('#scDur').onchange=e=>{const m=curMix();if(m){m.dur=Math.max(.1,+e.target.value||.5);saveSoon();}};
+$('#scSmart').onchange=e=>{const m=curMix();if(m){m.smart=e.target.checked;saveSoon();}};
 /* Mix */
 $('#mixAdd').onclick=()=>{const m=byId[curView];if(m?.type!=='mix'||m.layers.length>=8)return;m.layers.push({on:true,src:m.layers.length?'timer':'slides',x:m.layers.length?70:0,y:m.layers.length?2:0,sc:m.layers.length?28:100,op:100});renderMix();updLive();saveSoon();};
 $('#mixRows').addEventListener('input',e=>{const m=byId[curView],tr=e.target.closest('tr'),k=e.target.dataset.k;if(!m||!tr||!k)return;const l=m.layers[+tr.dataset.i];
- l[k]=e.target.type==='checkbox'?e.target.checked:e.target.tagName==='SELECT'?e.target.value:(+e.target.value||0);updLive();saveSoon();});
+ l[k]=e.target.type==='checkbox'?e.target.checked:e.target.tagName==='SELECT'?e.target.value:(+e.target.value||0);if(k==='on'||k==='src')renderScenes(m);updLive();saveSoon();});
 $('#mixRows').addEventListener('click',e=>{const b=e.target.closest('button[data-a]');if(!b)return;const m=byId[curView],i=+b.closest('tr').dataset.i,L=m.layers;
  if(b.dataset.a==='del')L.splice(i,1);else if(b.dataset.a==='up'&&i>0)[L[i-1],L[i]]=[L[i],L[i-1]];else if(b.dataset.a==='dn'&&i<L.length-1)[L[i+1],L[i]]=[L[i],L[i+1]];renderMix();updLive();saveSoon();});
 window.addEventListener('beforeunload',()=>{idb.set('state',snapshot());});
 
 /* ---------- FERNSTEUERUNG (Companion / HTTP, Desktop-App) ---------- */
 PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowerCase();const n=v=>Number(v);
- const go=d=>{if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else lyStep(d);};
+ const go=d=>{if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
+ const mixOf=()=>byId['mix'+(p.m||1)];
  switch(cmd){
   case'next':case'go/next':go(1);break;case'prev':case'go/prev':go(-1);break;
   case'slides/next':slideGo(S.idx+1);break;case'slides/prev':slideGo(S.idx-1);break;case'slides/goto':slideGo(n(p.n)-1);break;
@@ -928,13 +1040,17 @@ PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowe
   case'timer/mode':if(['down','up','clock'].includes(p.m)){T.mode=p.m;T.running=false;T.acc=0;updTimerUI();}break;
   case'blackout/toggle':case'blackout':setBO(!BO);break;case'blackout/on':setBO(true);break;case'blackout/off':setBO(false);break;
   case'stage/message':setStageMsg(p.text||'');break;case'stage/clear':setStageMsg('');break;
-  case'clicker':if(['slides','doc','lyrics'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
+  case'mix/scene':{const m=mixOf();if(m)sceneGo(m,n(p.s)-1);break;}
+  case'mix/next':{const m=mixOf();if(m)sceneGo(m,m.act+1);break;}case'mix/prev':{const m=mixOf();if(m)sceneGo(m,m.act-1);break;}
+  case'mix/step':{const m=mixOf();if(m)mixStep(m,n(p.d)||1);break;}
+  case'clicker':if(['slides','doc','lyrics','mix1','mix2','mix3','mix4'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
   case'state':break;
   default:return{ok:false,error:'Unbekannter Befehl: '+cmd};}
  saveSoon();return{ok:true,state:PV.state()};};
 PV.state=function(){const ts=tState();return{blackout:BO,clicker,
  timer:{text:ts.txt,running:T.running,mode:T.mode,remaining:T.mode==='down'?Math.ceil(T.dur-tEl()):null,overtime:!!ts.up},
  slides:{n:S.ps?S.idx+1:0,total:S.ps?S.ps.n:0,video:!!curVideo()},doc:{page:D.ps?docPage()+1:0,total:D.ps?D.ps.n:0},
+ mix:MIX.map(m=>({scene:m.act+1,name:m.scenes[m.act]?.name||'',total:m.scenes.length})),
  lyrics:{title:LY.title,line:LY.idx>=0?(LY.lines[LY.idx]?.text||''):'',playing:LY.playing},stage:{message:ST.msg},
  outputs:outputs.map(o=>({id:o.id,source:o.src,ndi:o.ndi,window:!!o.win}))};};
 
@@ -966,6 +1082,7 @@ async function initNative(){const nb=$('#nativeBox');
 (async()=>{show('timer');syncInputs();requestAnimationFrame(frame);try{await initNative();}catch(e){console.error(e);}
  const st=await idb.get('state');if(!st)return;
  const outs=await applySnap(st,await idb.get('docFiles'),await idb.get('slideFiles'));
+ const mf=await idb.get('mediaFiles');if(Array.isArray(mf))for(let i=0;i<MED.length;i++)if(mf[i])await medLoad(MED[i],mf[i]);
  show(curView);toast('Letzte Sitzung wiederhergestellt.');offerOuts(outs);})();
 }
 </script>

@@ -108,7 +108,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <label title="Ausgabe-Auflösung">Auflösung
   <select id="res"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K (2160p)</option></select></label>
  <label title="Was steuert der Presenter-Clicker / die Pfeiltasten?">Clicker steuert
-  <select id="clicker"><option value="slides">Folien</option><option value="doc">Dokument</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
+  <select id="clicker"><option value="slides">Folien (zuletzt aktiv)</option><option value="doc">Dokument (zuletzt aktiv)</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
  <div class="sp"></div>
  <button id="newShow">Neue Show</button>
  <button id="loadShow">Show öffnen…</button><input type="file" id="loadFile" accept=".cuestack,.json" hidden>
@@ -120,11 +120,19 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
 <nav id="nav">
  <h4>Module</h4>
  <button data-v="timer">Timer <span class="live">LIVE</span></button>
- <button data-v="doc">Dokument <span class="live">LIVE</span></button>
- <button data-v="slides">Folien <span class="live">LIVE</span></button>
  <button data-v="lyrics">Lyrics <span class="live">LIVE</span></button>
  <button data-v="presenter">Referentenansicht <span class="live">LIVE</span></button>
  <button data-v="stage">Stage-Monitor <span class="live">LIVE</span></button>
+ <h4>Folien / PowerPoint</h4>
+ <button data-v="slides">Folien 1 <span class="live">LIVE</span></button>
+ <button data-v="slides2">Folien 2 <span class="live">LIVE</span></button>
+ <button data-v="slides3">Folien 3 <span class="live">LIVE</span></button>
+ <button data-v="slides4">Folien 4 <span class="live">LIVE</span></button>
+ <h4>Dokumente / PDF</h4>
+ <button data-v="doc">Dokument 1 <span class="live">LIVE</span></button>
+ <button data-v="doc2">Dokument 2 <span class="live">LIVE</span></button>
+ <button data-v="doc3">Dokument 3 <span class="live">LIVE</span></button>
+ <button data-v="doc4">Dokument 4 <span class="live">LIVE</span></button>
  <h4>Medien (Bild/Video)</h4>
  <button data-v="med1">Medien 1 <span class="live">LIVE</span></button>
  <button data-v="med2">Medien 2 <span class="live">LIVE</span></button>
@@ -174,10 +182,10 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
 
  <!-- DOKUMENT -->
  <section class="panel" id="p-doc">
-  <div class="ph"><h2>Dokument</h2><span class="hint" id="docInfo">–</span><button class="toOut">Auf Ausgang ▸</button></div>
+  <div class="ph"><h2 id="docTitle">Dokument 1</h2><span class="hint" id="docName" style="flex:1"></span><span class="hint" id="docInfo">–</span><button class="toOut">Auf Ausgang ▸</button></div>
   <div class="pv drop" id="pv-doc" data-for="doc"><div class="empty" id="docEmpty">PDF oder Bilder hierher ziehen<br>oder „Datei öffnen“</div></div>
   <div class="row">
-   <button id="docOpen" class="pri">Datei öffnen…</button><input type="file" id="docFile" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden>
+   <button id="docOpen" class="pri">Datei öffnen…</button><input type="file" id="docFile" accept=".pdf,image/*,.heic,.heif,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden>
    <button id="docPrev" class="big">▲ Seite</button><button id="docNext" class="big">▼ Seite</button>
    <button id="docUp">↑ Scroll</button><button id="docDn">↓ Scroll</button><button id="docTop">Anfang</button>
    <label>Gehe zu Seite<input type="number" id="docJump" min="1" value="1" style="width:80px"></label>
@@ -192,7 +200,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
 
  <!-- FOLIEN -->
  <section class="panel" id="p-slides">
-  <div class="ph"><h2>Folien</h2><span class="hint" id="slInfo">–</span><button class="toOut">Auf Ausgang ▸</button></div>
+  <div class="ph"><h2 id="slTitle">Folien 1</h2><span class="hint" id="slName" style="flex:1"></span><span class="hint" id="slInfo">–</span><button class="toOut">Auf Ausgang ▸</button></div>
   <div class="two">
    <div class="pv drop" id="pv-slides" data-for="slides"><div class="empty" id="slEmpty">PDF-Präsentation oder Bilder hierher ziehen</div></div>
    <div><div class="hint" style="margin-bottom:4px">Nächste Folie</div><canvas id="nextPv" width="384" height="216"></canvas>
@@ -200,7 +208,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
   </div>
   <div id="thumbs"></div>
   <div class="row">
-   <button id="slOpen" class="pri">Datei öffnen…</button><input type="file" id="slFile" accept=".pdf,image/*,video/mp4,video/webm,.mp4,.webm,.m4v,.mov,.ppt,.pptx,.pps,.ppsx,.key,.odp" multiple hidden>
+   <button id="slOpen" class="pri">Datei öffnen…</button><input type="file" id="slFile" accept=".pdf,image/*,.heic,.heif,video/mp4,video/webm,.mp4,.webm,.m4v,.mov,.ppt,.pptx,.pps,.ppsx,.key,.odp" multiple hidden>
    <label>Übergang<select id="slTrans"><option value="cut">Schnitt</option><option value="fade" selected>Überblenden</option><option value="dip">Über Schwarz</option><option value="push">Schieben</option><option value="slide">Hineingleiten</option><option value="up">Vertikal</option><option value="zoom">Zoom</option><option value="blur">Unschärfe</option><option value="wipe">Wischen</option></select></label>
    <label>Dauer (s)<input type="number" id="slDur" min="0.1" max="5" step="0.1" value="0.6" style="width:80px"></label>
    <label>Darstellung<select id="slFit"><option value="contain">Einpassen</option><option value="cover">Füllen</option><option value="stretch">Strecken</option></select></label>
@@ -290,7 +298,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
   <div class="ph"><h2 id="medTitle">Medien</h2><span class="hint" id="medLabel">Leer</span><button class="toOut">Auf Ausgang ▸</button></div>
   <div class="pv drop" id="pv-med" data-for="med"><div class="empty" id="medEmpty">Bild oder Video hierher ziehen<br>(Logo, Pausenbild, Sponsor, Einspieler)</div></div>
   <div class="row">
-   <button id="medOpen" class="pri big">Datei öffnen…</button><input type="file" id="medFile" accept="image/*,video/mp4,video/webm,.mp4,.webm,.m4v,.mov" hidden>
+   <button id="medOpen" class="pri big">Datei öffnen…</button><input type="file" id="medFile" accept="image/*,.heic,.heif,video/mp4,video/webm,.mp4,.webm,.m4v,.mov" hidden>
    <button id="medPlay" class="big">▶ / ❚❚</button><button id="medClear">Leeren</button>
    <label>Darstellung<select id="medFit"><option value="contain">Einpassen</option><option value="cover">Füllen</option><option value="stretch">Strecken</option></select></label>
   </div>
@@ -377,6 +385,16 @@ function loadPdfLib(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib)
  return pdfLibP||(pdfLibP=tryPath(0).catch(e=>{pdfLibP=null;throw e;}));}
 const isPdf=f=>/pdf/.test(f.type)||/\.pdf$/i.test(f.name);
 const isImg=f=>/^image\//.test(f.type)||/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(f.name);
+const isHeicF=f=>/\.(heic|heif)$/i.test(f.name||'')||/image\/hei[cf]/i.test(f.type||'');
+const HEIC_PATHS=['./vendor/heic/heic-to.js','https://cdn.jsdelivr.net/npm/heic-to@1.6.7/dist/iife/heic-to.js'];let heicP=null;
+function loadHeic(){if(window.HeicTo)return Promise.resolve(window.HeicTo);
+ const tryPath=i=>new Promise((res,rej)=>{if(i>=HEIC_PATHS.length){rej(new Error('HEIC-Modul konnte nicht geladen werden – Internetverbindung prüfen.'));return;}
+  const s=document.createElement('script');s.src=HEIC_PATHS[i];s.onload=()=>window.HeicTo?res(window.HeicTo):tryPath(i+1).then(res,rej);s.onerror=()=>{s.remove();tryPath(i+1).then(res,rej);};document.head.appendChild(s);});
+ return heicP||(heicP=tryPath(0).catch(e=>{heicP=null;throw e;}));}
+/* iPhone-Fotos (HEIC/HEIF) → JPEG, damit jeder Browser sie anzeigen kann */
+async function normFile(f){if(!f||!isHeicF(f))return f;toast('Wandle „'+f.name+'“ (HEIC) um …');const lib=await loadHeic();
+ const blob=await lib({blob:new Blob([f.bytes],{type:'image/heic'}),type:'image/jpeg',quality:.92});
+ return{name:f.name.replace(/\.(heic|heif)$/i,'')+'.jpg',type:'image/jpeg',bytes:await blob.arrayBuffer(),notes:f.notes||null};}
 const isVid=f=>/^video\//.test(f.type)||/\.(mp4|webm|m4v|mov|ogv)$/i.test(f.name);
 function officeHint(n){if(/\.(pptx?|ppsx?|key)$/i.test(n))return'PowerPoint direkt öffnen geht in der Desktop-App. Im Browser: als PDF exportieren (PowerPoint/Keynote: Exportieren → PDF; Google Slides/Canva: Herunterladen → PDF).';
  if(/\.(docx?|xlsx?|odt|ods)$/i.test(n))return'Word/Excel bitte als PDF speichern (Datei → Exportieren → PDF), dann öffnen.';return'Dateityp nicht unterstützt: '+n;}
@@ -439,6 +457,7 @@ async function readFiles(list,allowVid){const arr=[...list].sort((a,b)=>a.name.l
     const r=await NATIVE.convertOffice(f.name,ab);if(r.error)throw new Error(r.error);
     out.push({name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',bytes:r.pdf,notes});toast('„'+f.name+'“ umgewandelt ('+r.via+')'+(notes&&notes.some(Boolean)?' – inkl. Sprechernotizen.':'.'));}
    catch(e){toast('Umwandlung fehlgeschlagen: '+e.message);}continue;}
+  if(isHeicF(f)){try{out.push(await normFile({name:f.name,type:f.type,bytes:await f.arrayBuffer()}));}catch(e){toast('HEIC-Umwandlung fehlgeschlagen: '+e.message);}continue;}
   if(!isPdf(f)&&!isImg(f)&&!(allowVid&&isVid(f))){toast(officeHint(f.name));continue;}out.push({name:f.name,type:f.type,bytes:await f.arrayBuffer()});}return out;}
 const isOffice=f=>/\.(pptx?|ppsx?|key|docx?|odt|odp|rtf|xlsx?|ods)$/i.test(f.name);
 
@@ -469,67 +488,80 @@ function updTimerUI(){$('#tGo').textContent=T.running?'Pause':'Start';$('#tGo').
  $$('#tMode button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===T.mode));byId.timer.dirty=true;}
 
 /* ---------- DOKUMENT ---------- */
-const D={files:[],ps:null,zoom:1,fit:'width',scroll:0,target:0,speed:0,L:[],total:0};
-function docLayout(){D.L=[];D.total=0;if(!D.ps)return;const g=H*.02;let y=0;
+/* Mehrere Dokumente: DL[0..3]. D = im Panel angezeigt, FD = zuletzt benutzt (Clicker/Companion) */
+const DL=[1,2,3,4].map(n=>({n,id:n===1?'doc':'doc'+n,files:[],ps:null,zoom:1,fit:'width',scroll:0,target:0,speed:0,L:[],total:0}));
+let D=DL[0],FD=DL[0];
+const docKey=st=>st.n===1?'docFiles':'docFiles'+st.n;
+function docLayout(st=D){const D=st;D.L=[];D.total=0;if(!D.ps)return;const g=H*.02;let y=0;
  for(const it of D.ps.items){let w,h;if(D.fit==='page'){h=H*D.zoom;w=h*it.w/it.h;}else{w=W*D.zoom;h=w*it.h/it.w;}D.L.push({x:(W-w)/2,y,w,h});y+=h+g;}
- D.total=Math.max(0,y-g);byId.doc.dirty=true;}
-const docMax=()=>Math.max(0,D.total-H);
-function docPage(){let i=0;const y=D.target+H*.3;D.L.forEach((r,k)=>{if(r.y<=y)i=k;});return i;}
-function docGoto(i){if(!D.L.length)return;i=Math.max(0,Math.min(D.L.length-1,i));D.target=Math.min(docMax(),D.L[i].y);byId.doc.dirty=true;}
+ D.total=Math.max(0,y-g);byId[D.id].dirty=true;}
+const docMax=(st=D)=>Math.max(0,st.total-H);
+function docPage(st=D){let i=0;const y=st.target+H*.3;st.L.forEach((r,k)=>{if(r.y<=y)i=k;});return i;}
+function docGoto(i,st=D){const D=st;FD=D;if(!D.L.length)return;i=Math.max(0,Math.min(D.L.length-1,i));D.target=Math.min(docMax(D),D.L[i].y);byId[D.id].dirty=true;}
 function docZoom(z){const pg=docPage();D.zoom=Math.max(.3,Math.min(4,z));docLayout();docGoto(pg);D.scroll=D.target;$('#docZoom').textContent=Math.round(D.zoom*100)+' %';saveSoon();}
-addSource({id:'doc',type:'doc',name:'Dokument',draw(now,dt){
- if(D.speed)D.target+=D.speed*H*.02*dt;D.target=Math.max(0,Math.min(docMax(),D.target));
+for(const st of DL)addSource({id:st.id,type:'doc',name:'Dokument '+st.n,st,draw(now,dt){const D=this.st;
+ if(D.speed)D.target+=D.speed*H*.02*dt;D.target=Math.max(0,Math.min(docMax(D),D.target));
  const d=D.target-D.scroll,mv=Math.abs(d)>.5;D.scroll=mv?D.scroll+d*Math.min(1,dt*10):D.target;
  if(!mv&&!this.dirty)return;this.dirty=false;const c=this.ctx;c.clearRect(0,0,W,H);if(!D.ps)return;
  for(let i=0;i<D.L.length;i++){const r=D.L[i],y=r.y-D.scroll;if(y+r.h<0||y>H)continue;const img=D.ps.get(i,r.w);
   if(img)c.drawImage(img,r.x,y,r.w,r.h);else{c.fillStyle='#fff';c.fillRect(r.x,y,r.w,r.h);}}
 }});
-async function setDocFiles(files,page=0){if(!files.length)return;$('#docEmpty').textContent='Lade…';
- try{const ps=await buildPageSet(files);D.files=files;D.ps=ps;ps.onupdate=()=>{byId.doc.dirty=true;};docLayout();docGoto(page);D.scroll=D.target;
-  $('#docEmpty').style.display='none';$('#docJump').max=ps.n;idb.set('docFiles',files);saveSoon();
- }catch(e){toast(e.message);$('#docEmpty').innerHTML='PDF oder Bilder hierher ziehen<br>oder „Datei öffnen“';}}
+function updDocUI(){$('#docTitle').textContent='Dokument '+D.n;$('#docEmpty').style.display=D.ps?'none':'';$('#docEmpty').innerHTML='PDF oder Bilder hierher ziehen<br>oder „Datei öffnen“';
+ $('#docJump').max=D.ps?D.ps.n:1;$('#docSpeed').value=D.speed;$('#docName').textContent=D.files.map(f=>f.name).join(', ');
+ $$('#docFit button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===D.fit));$('#docZoom').textContent=Math.round(D.zoom*100)+' %';}
+async function setDocFiles(files,page=0,st=D){const D=st;if(!files.length)return;if(D===window.PV.uiD())$('#docEmpty').textContent='Lade…';
+ try{const ps=await buildPageSet(files);D.files=files;D.ps=ps;ps.onupdate=()=>{byId[D.id].dirty=true;};docLayout(D);docGoto(page,D);D.scroll=D.target;
+  idb.set(docKey(D),files);saveSoon();
+ }catch(e){toast(e.message);}if(D===window.PV.uiD())updDocUI();}
 
-/* ---------- FOLIEN ---------- */
-const S={files:[],ps:null,idx:0,prev:-1,dir:1,t0:0,trans:'fade',dur:.6,auto:false,interval:8,loop:true,fit:'contain',lastAuto:0,audio:true,vidNext:false,vidLoop:false,notes:[],shownAt:0};
-const curVideo=()=>S.ps&&S.ps.items[S.idx]?.video||null;
-function startVideo(i){const it=S.ps?.items[i];if(!it?.video)return;const v=it.video;v.muted=!S.audio;v.loop=S.vidLoop;try{v.currentTime=0;}catch(e){}
- v.onended=()=>{if(S.ps?.items[S.idx]===it&&S.vidNext)slideGo(S.idx+1);};v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});toast('Video läuft stumm – Browser blockiert Ton ohne Klick.');});}
-function slideGo(i){if(!S.ps||!S.ps.n)return;const n=S.ps.n;let dir=i>S.idx?1:-1;
+/* ---------- FOLIEN: SL[0..3]. S = im Panel angezeigt, FS = zuletzt benutzt (Referent, Stage, Clicker) ---------- */
+const SL=[1,2,3,4].map(n=>({n,id:n===1?'slides':'slides'+n,files:[],ps:null,idx:0,prev:-1,dir:1,t0:0,trans:'fade',dur:.6,auto:false,interval:8,loop:true,fit:'contain',lastAuto:0,audio:true,vidNext:false,vidLoop:false,notes:[],shownAt:0}));
+let S=SL[0],FS=SL[0];
+PV.uiS=()=>S;PV.uiD=()=>D;
+const slideKey=st=>st.n===1?'slideFiles':'slideFiles'+st.n;
+const deckOf=id=>byId[id]?.st||null;
+const curVideo=(st=S)=>st.ps&&st.ps.items[st.idx]?.video||null;
+function startVideo(i,st=S){const S=st;const it=S.ps?.items[i];if(!it?.video)return;const v=it.video;v.muted=!S.audio;v.loop=S.vidLoop;try{v.currentTime=0;}catch(e){}
+ v.onended=()=>{if(S.ps?.items[S.idx]===it&&S.vidNext)slideGo(S.idx+1,S);};v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});toast('Video läuft stumm – Browser blockiert Ton ohne Klick.');});}
+function slideGo(i,st=S){const S=st;FS=S;if(!S.ps||!S.ps.n)return;const n=S.ps.n;let dir=i>S.idx?1:-1;
  if(i>=n){if(!S.loop)return;i=0;dir=1;}if(i<0){if(!S.loop)return;i=n-1;dir=-1;}if(i===S.idx)return;
  const old=S.ps.items[S.idx];if(old?.video){setTimeout(()=>{if(S.ps?.items[S.idx]!==old)old.video.pause();},S.dur*1000+50);}
- S.prev=S.idx;S.dir=dir;S.idx=i;S.t0=performance.now();S.lastAuto=Date.now();startVideo(i);byId.slides.dirty=true;updSlideUI();saveSoon();}
-function drawPage(c,i,a,dx=0,dy=0,sc=1){const it=S.ps.items[i];if(!it||a<=0)return;const[x,y,w,h]=fitRect(it.w,it.h,W,H,S.fit);const img=S.ps.get(i,w);if(!img)return;
+ S.prev=S.idx;S.dir=dir;S.idx=i;S.t0=performance.now();S.lastAuto=Date.now();startVideo(i,S);byId[S.id].dirty=true;updSlideUI();saveSoon();}
+function drawPage(c,S,i,a,dx=0,dy=0,sc=1){const it=S.ps.items[i];if(!it||a<=0)return;const[x,y,w,h]=fitRect(it.w,it.h,W,H,S.fit);const img=S.ps.get(i,w);if(!img)return;
  c.save();c.globalAlpha=a;if(sc!==1){c.translate(W/2,H/2);c.scale(sc,sc);c.translate(-W/2,-H/2);}c.drawImage(img,x+dx,y+dy,w,h);c.restore();}
-addSource({id:'slides',type:'slides',name:'Folien',draw(now){
- const cv=curVideo(),p=(S.prev<0||S.trans==='cut')?1:Math.min(1,(now-S.t0)/(S.dur*1000)),an=p<1||!!(cv&&!cv.paused);
+for(const st of SL)addSource({id:st.id,type:'slides',name:'Folien '+st.n,st,draw(now){const S=this.st;
+ const cv=curVideo(S),p=(S.prev<0||S.trans==='cut')?1:Math.min(1,(now-S.t0)/(S.dur*1000)),an=p<1||!!(cv&&!cv.paused);
  if(!an&&!this.dirty&&!this.was)return;this.was=an;this.dirty=false;const c=this.ctx;c.clearRect(0,0,W,H);if(!S.ps||!S.ps.n)return;
  S.ps.get(S.idx+1,W);const e=ease(p),P=S.prev,I=S.idx,d=S.dir;
- if(p>=1){drawPage(c,I,1);return;}
+ if(p>=1){drawPage(c,S,I,1);return;}
  switch(S.trans){
-  case'fade':drawPage(c,P,1-e);drawPage(c,I,e);break;
-  case'dip':if(p<.5)drawPage(c,P,1-ease(p*2));else drawPage(c,I,ease(p*2-1));break;
-  case'push':drawPage(c,P,1,-d*W*e);drawPage(c,I,1,d*W*(1-e));break;
-  case'slide':drawPage(c,P,1);drawPage(c,I,1,d*W*(1-e));break;
-  case'up':drawPage(c,P,1,0,-d*H*e);drawPage(c,I,1,0,d*H*(1-e));break;
-  case'zoom':drawPage(c,P,1-e,0,0,1+.15*e);drawPage(c,I,e,0,0,.85+.15*e);break;
-  case'blur':c.filter=`blur(${Math.round(e*40)}px)`;drawPage(c,P,1-e);c.filter=`blur(${Math.round((1-e)*40)}px)`;drawPage(c,I,e);c.filter='none';break;
-  case'wipe':drawPage(c,P,1);c.save();c.beginPath();d>0?c.rect(0,0,W*e,H):c.rect(W*(1-e),0,W*e,H);c.clip();drawPage(c,I,1);c.restore();break;
-  default:drawPage(c,I,1);}
+  case'fade':drawPage(c,S,P,1-e);drawPage(c,S,I,e);break;
+  case'dip':if(p<.5)drawPage(c,S,P,1-ease(p*2));else drawPage(c,S,I,ease(p*2-1));break;
+  case'push':drawPage(c,S,P,1,-d*W*e);drawPage(c,S,I,1,d*W*(1-e));break;
+  case'slide':drawPage(c,S,P,1);drawPage(c,S,I,1,d*W*(1-e));break;
+  case'up':drawPage(c,S,P,1,0,-d*H*e);drawPage(c,S,I,1,0,d*H*(1-e));break;
+  case'zoom':drawPage(c,S,P,1-e,0,0,1+.15*e);drawPage(c,S,I,e,0,0,.85+.15*e);break;
+  case'blur':c.filter=`blur(${Math.round(e*40)}px)`;drawPage(c,S,P,1-e);c.filter=`blur(${Math.round((1-e)*40)}px)`;drawPage(c,S,I,e);c.filter='none';break;
+  case'wipe':drawPage(c,S,P,1);c.save();c.beginPath();d>0?c.rect(0,0,W*e,H):c.rect(W*(1-e),0,W*e,H);c.clip();drawPage(c,S,I,1);c.restore();break;
+  default:drawPage(c,S,I,1);}
 }});
-async function setSlideFiles(files,idx=0,notes=null){if(!files.length)return;$('#slEmpty').textContent='Lade…';
+async function setSlideFiles(files,idx=0,notes=null,st=S){const S=st;if(!files.length)return;if(S===PV.uiS())$('#slEmpty').textContent='Lade…';
  try{const ps=await buildPageSet(files);if(S.ps)S.ps.dispose();S.files=files;S.ps=ps;S.idx=Math.min(idx,ps.n-1);S.prev=-1;
-  S.notes=Array.isArray(notes)&&notes.length?notes.slice(0,ps.n):ps.items.map(it=>it.note||'');ps.onupdate=i=>{byId.slides.dirty=true;if(i===S.idx+1)drawNext();};
-  startVideo(S.idx);
-  $('#slEmpty').style.display='none';buildThumbs();updSlideUI();idb.set('slideFiles',files);saveSoon();
- }catch(e){toast(e.message);$('#slEmpty').textContent='PDF-Präsentation oder Bilder hierher ziehen';}}
-async function buildThumbs(){const box=$('#thumbs');box.innerHTML='';if(!S.ps)return;const ps=S.ps;
+  S.notes=Array.isArray(notes)&&notes.length?notes.slice(0,ps.n):ps.items.map(it=>it.note||'');ps.onupdate=i=>{byId[S.id].dirty=true;if(S===PV.uiS()&&i===S.idx+1)drawNext();};
+  idb.set(slideKey(S),files);saveSoon();
+ }catch(e){toast(e.message);}
+ if(S===PV.uiS()){updSlidePanel();}}
+function updSlidePanel(){$('#slTitle').textContent='Folien '+S.n;$('#slEmpty').style.display=S.ps?'none':'';$('#slEmpty').textContent='PDF, PowerPoint, Bilder oder Videos hierher ziehen';
+ $('#slName').textContent=S.files.map(f=>f.name).join(', ');syncSlideInputs();buildThumbs();}
+async function buildThumbs(){const box=$('#thumbs');box.innerHTML='';if(!S.ps){updSlideUI();return;}const ps=S.ps;
  for(let i=0;i<ps.n;i++){const b=document.createElement('button');b.className='th';b.dataset.i=i;b.title='Folie '+(i+1);b.appendChild(mk(288,162));const sp=document.createElement('span');sp.textContent=i+1;b.appendChild(sp);box.appendChild(b);}
  updSlideUI();for(const b of $$('#thumbs .th')){if(S.ps!==ps)return;try{await ps.thumb(+b.dataset.i,b.firstChild);}catch(e){}}}
 function drawNext(){const cv=$('#nextPv'),x=cv.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,cv.width,cv.height);if(!S.ps)return;
  let n=S.idx+1;if(n>=S.ps.n){if(!S.loop){x.fillStyle='#8d95a8';x.font='16px system-ui';x.textAlign='center';x.fillText('Ende',cv.width/2,cv.height/2);return;}n=0;}
  const it=S.ps.items[n],img=S.ps.get(n,W);if(!img)return;const[a,b,w,h]=fitRect(it.w,it.h,cv.width,cv.height,'contain');x.drawImage(img,a,b,w,h);}
-function updSlideUI(){$('#slInfo').textContent=S.ps?`Folie ${S.idx+1} / ${S.ps.n}`:'–';S.shownAt=Date.now();
- const na=$('#prNotes');if(na&&document.activeElement!==na)na.value=S.notes[S.idx]||'';$('#prInfo').textContent=S.ps?`Folie ${S.idx+1} / ${S.ps.n}`:'Keine Folien geladen';byId.presenter&&(byId.presenter.dirty=true);
+function updSlideUI(){$('#slInfo').textContent=S.ps?`Folie ${S.idx+1} / ${S.ps.n}`:'–';
+ const F=FS,na=$('#prNotes');if(na&&document.activeElement!==na)na.value=F.ps?(F.notes[F.idx]||''):'';
+ $('#prInfo').textContent=F.ps?`Folien ${F.n} · Folie ${F.idx+1} / ${F.ps.n}`:'Keine Folien geladen';byId.presenter&&(byId.presenter.dirty=true);
  $$('#thumbs .th').forEach(b=>b.classList.toggle('cur',+b.dataset.i===S.idx));const cur=$('#thumbs .th.cur');if(cur)cur.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});drawNext();}
 
 /* ---------- LYRICS ---------- */
@@ -636,7 +668,7 @@ const MED=[1,2,3,4].map(n=>addSource({id:'med'+n,type:'med',name:'Medien '+n,fil
   const[x,y,w,h]=fitRect(iw,ih,W,H,this.fit);try{c.drawImage(src,x,y,w,h);}catch(e){}}}));
 function medClear(s){if(s.video){s.video.pause();s.video.removeAttribute('src');s.video.load();s.video.remove();}if(s.url)URL.revokeObjectURL(s.url);s.img=s.video=null;s.url='';s.file=null;s.dirty=true;}
 async function medLoad(s,f){medClear(s);if(!f)return;
- try{if(isImg(f)){s.img=await createImageBitmap(new Blob([f.bytes],{type:f.type||'image/png'}));}
+ try{f=await normFile(f);if(isImg(f)){s.img=await createImageBitmap(new Blob([f.bytes],{type:f.type||'image/png'}));}
   else if(isVid(f)){s.url=URL.createObjectURL(new Blob([f.bytes],{type:f.type||'video/mp4'}));const v=document.createElement('video');v.src=s.url;v.loop=s.loop;v.muted=!s.audio;v.playsInline=true;
    $('#vids').appendChild(v);const ok=await new Promise(r=>{v.onloadeddata=()=>r(true);v.onerror=()=>r(false);});if(!ok)throw new Error('Video-Format nicht abspielbar (MP4/H.264 oder WebM)');
    s.video=v;v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});});}
@@ -663,13 +695,19 @@ const MIX=[1,2,3,4].map(n=>addSource({id:'mix'+n,type:'mix',name:'Mix '+n,scenes
   drawLayers(a,this.scenes[this.prev]?.layers||[]);drawLayers(b,this.live);const e=ease(p);
   c.globalAlpha=1-e;c.drawImage(tmpA,0,0);c.globalCompositeOperation='lighter';c.globalAlpha=e;c.drawImage(tmpB,0,0);c.globalCompositeOperation='source-over';c.globalAlpha=1;}}));
 function sceneGo(m,i){if(!m.scenes.length)return;i=Math.max(0,Math.min(m.scenes.length-1,i));if(i===m.act&&m.prev<0)return;
- m.prev=m.act;m.act=i;m.t0=performance.now();m.scenes[i].layers.forEach(l=>{if(l.on&&String(l.src).startsWith('med'))medRestart(l.src);});
+ m.prev=m.act;m.act=i;m.t0=performance.now();
+ for(const l of m.scenes[i].layers){if(!l.on)continue;const x=byId[l.src];if(x?.type==='slides'){FS=x.st;updSlideUI();}if(x?.type==='doc')FD=x.st;}m.scenes[i].layers.forEach(l=>{if(l.on&&String(l.src).startsWith('med'))medRestart(l.src);});
  updLive();if(curView===m.id)renderMix();saveSoon();}
 /* Clicker auf einem Mix: erst durch Folien/Dokument der Szene blättern, dann nächste Szene */
-function mixStep(m,d){const live=m.live.filter(l=>l.on).map(l=>l.src);
- if(m.smart){if(live.includes('slides')&&S.ps){const t=S.idx+d;if(t>=0&&t<S.ps.n){slideGo(t);return;}}
-  else if(live.includes('doc')&&D.ps){const t=docPage()+d;if(t>=0&&t<D.ps.n){docGoto(t);return;}}}
- sceneGo(m,m.act+d);}
+function mixStep(m,d){const live=m.live.filter(l=>l.on).map(l=>byId[l.src]).filter(Boolean);
+ if(m.smart){const sd=live.find(x=>x.type==='slides'&&x.st.ps)?.st,dd=live.find(x=>x.type==='doc'&&x.st.ps)?.st;
+  if(sd){const t=sd.idx+d;if(t>=0&&t<sd.ps.n){slideGo(t,sd);return;}}
+  else if(dd){const t=docPage(dd)+d;if(t>=0&&t<dd.ps.n){docGoto(t,dd);return;}}}
+ const before=m.act;sceneGo(m,m.act+d);if(!m.smart||m.act===before)return;
+ /* vorwärts in eine Szene: Präsentation von vorn, rückwärts: ab letzter Folie */
+ for(const x of m.live.filter(l=>l.on).map(l=>byId[l.src]).filter(Boolean)){const st=x.st;if(!st?.ps)continue;
+  if(x.type==='slides'){const t=d>0?0:st.ps.n-1;if(st.idx!==t){st.prev=-1;st.idx=t;startVideo(t,st);x.dirty=true;}FS=st;updSlideUI();}
+  if(x.type==='doc'){docGoto(d>0?0:st.ps.n-1,st);st.scroll=st.target;x.dirty=true;}}}
 const LAYER_SRC=()=>sources.filter(s=>s.type!=='mix');
 function renderScenes(m){const box=$('#scenes');box.innerHTML='';
  m.scenes.forEach((sc,i)=>{const d=document.createElement('div');d.className='scene'+(i===m.act?' onair':'')+(i===m.edit?' edit':'');d.dataset.i=i;
@@ -692,13 +730,13 @@ function boxImg(c,img,iw,ih,x,y,w,h){c.fillStyle='#111';c.fillRect(x,y,w,h);if(i
  c.strokeStyle='#333';c.lineWidth=Math.max(1,H/540);c.strokeRect(x,y,w,h);}
 addSource({id:'stage',type:'stage',name:'Stage-Monitor',last:0,draw(now){
  if(now-this.last<66&&!this.dirty)return;this.last=now;this.dirty=false;
- const c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif';c.fillStyle='#000';c.fillRect(0,0,W,H);c.textBaseline='middle';
+ const S=FS,c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif';c.fillStyle='#000';c.fillRect(0,0,W,H);c.textBaseline='middle';
  const d=new Date();c.font=`700 ${7*u}px ${A}`;c.fillStyle='#8d95a8';c.textAlign='left';c.fillText(p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds()),3*u,8*u);
  if(T.mode!=='clock'&&(T.running||tEl()>0||T.mode==='down')){const ts=tState();const t=(ts.up&&T.msg?T.msg+'  ':'')+ts.txt;c.textAlign='right';c.fillStyle=ts.col;
   const F=s=>`700 ${s}px ${A}`;c.font=F(fitFont(c,t,W*.6,13*u,F));c.fillText(t,W-3*u,8*u);}
  const lyCur=(!LY.blank&&!LY.sb&&LY.idx>=0)?LY.lines[LY.idx]?.text||'':'',lyNext=LY.lines[LY.idx+1]?.text||'';
  const hasSl=ST.slides&&S.ps&&S.ps.n,top=17*u;let bottom=70*u;
- if(hasSl){const mh=50*u,cw=mh*16/9,cx=3*u;boxImg(c,byId.slides.canvas,W,H,cx,top,cw,mh);
+ if(hasSl){const mh=50*u,cw=mh*16/9,cx=3*u;boxImg(c,byId[S.id].canvas,W,H,cx,top,cw,mh);
   const nx=cx+cw+3*u,nw=W-nx-3*u,nh=nw*9/16;let n=S.idx+1;if(n>=S.ps.n)n=S.loop?0:-1;
   if(n>=0){const it=S.ps.items[n];boxImg(c,S.ps.get(n,nw*2),it.w,it.h,nx,top,nw,nh);}else boxImg(c,null,1,1,nx,top,nw,nh);
   c.font=`600 ${3.2*u}px ${A}`;c.fillStyle='#8d95a8';c.textAlign='left';c.fillText(`JETZT  ${S.idx+1}/${S.ps.n}`,cx,top-2.4*u);c.fillText(n>=0?`NÄCHSTE  ${n+1}`:'ENDE',nx,top-2.4*u);
@@ -718,13 +756,13 @@ function wrapFit(c,text,maxW,maxH,F,size,min){let s=size,lines;for(;;){c.font=F(
  const max=Math.max(1,Math.floor(maxH/(s*1.3)));if(lines.length>max){lines=lines.slice(0,max);lines[max-1]+=' …';}return{s,lines};}
 addSource({id:'presenter',type:'presenter',name:'Referentenansicht',last:0,draw(now){
  if(now-this.last<100&&!this.dirty)return;this.last=now;this.dirty=false;
- const c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif',B=s=>`700 ${s}px ${A}`;c.fillStyle='#0b0c10';c.fillRect(0,0,W,H);c.textBaseline='middle';
+ const S=FS,c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif',B=s=>`700 ${s}px ${A}`;c.fillStyle='#0b0c10';c.fillRect(0,0,W,H);c.textBaseline='middle';
  const d=new Date();c.font=B(6*u);c.fillStyle='#c9cfdb';c.textAlign='left';c.fillText(p2(d.getHours())+':'+p2(d.getMinutes()),3*u,6.5*u);
  if(PR.started){const el=Math.floor((Date.now()-PR.started)/1000);c.font=`400 ${3.6*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('Laufzeit '+fmt(el),24*u,6.5*u);}
  if(S.ps){c.textAlign='center';c.font=`600 ${4*u}px ${A}`;c.fillStyle='#c9cfdb';c.fillText(`Folie ${S.idx+1} / ${S.ps.n}`,W/2,6.5*u);}
  if(T.mode!=='clock'){const ts=tState();c.textAlign='right';c.fillStyle=ts.col;c.font=B(fitFont(c,ts.txt,W*.3,9*u,B));c.fillText(ts.txt,W-3*u,6.5*u);}
  const top=14*u,cw=W*.6,ch=cw*9/16,cx=2.5*u;
- boxImg(c,S.ps?byId.slides.canvas:null,W,H,cx,top,cw,Math.min(ch,H-top-3*u));
+ boxImg(c,S.ps?byId[S.id].canvas:null,W,H,cx,top,cw,Math.min(ch,H-top-3*u));
  const rx=cx+cw+2.5*u,rw=W-rx-2.5*u,nh=rw*9/16;c.textAlign='left';c.font=`600 ${3*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('NÄCHSTE',rx,top-2.6*u);
  let n=S.ps?S.idx+1:-1;if(S.ps&&n>=S.ps.n)n=S.loop?0:-1;
  if(n>=0){const it=S.ps.items[n];boxImg(c,S.ps.get(n,rw*2),it.w,it.h,rx,top,rw,nh);}else{boxImg(c,null,1,1,rx,top,rw,nh);c.textAlign='center';c.fillStyle='#555';c.font=`600 ${3.5*u}px ${A}`;c.fillText(S.ps?'Ende':'–',rx+rw/2,top+nh/2);}
@@ -805,11 +843,11 @@ async function detectScreens(){if(!('getScreenDetails' in window)){toast('Bildsc
 
 /* ---------- TICK ---------- */
 let lastT=0;
-function deps(s){return s?.type==='mix'?[...s.live,...(s.prev>=0?(s.scenes[s.prev]?.layers||[]):[]),...(curView===s.id?s.layers:[])].filter(l=>l.on).map(l=>l.src):(s?.type==='stage'||s?.type==='presenter')?['slides']:[];}
+function deps(s){return s?.type==='mix'?[...s.live,...(s.prev>=0?(s.scenes[s.prev]?.layers||[]):[]),...(curView===s.id?s.layers:[])].filter(l=>l.on).map(l=>l.src):(s?.type==='stage'||s?.type==='presenter')?[FS.id]:[];}
 function needed(){const n=new Set();const add=id=>{if(n.has(id))return;n.add(id);deps(byId[id]).forEach(add);};
  outputs.forEach(o=>add(o.src));add(curView);return n;}
 function logic(now){
- if(S.auto&&S.ps&&Date.now()-S.lastAuto>S.interval*1000){if(S.idx<S.ps.n-1||S.loop)slideGo(S.idx+1);else S.lastAuto=Date.now();}
+ for(const S of SL)if(S.auto&&S.ps&&Date.now()-S.lastAuto>S.interval*1000){if(S.idx<S.ps.n-1||S.loop)slideGo(S.idx+1,S);else S.lastAuto=Date.now();}
  if(LY.synced&&LY.playing){const p=lyPos();let i=-1;for(let k=0;k<LY.lines.length;k++){if(LY.lines[k].t<=p)i=k;else break;}
   const l=LY.lines[i],sb=!!(l&&l.e!=null&&p>l.e);if(i!==LY.idx||sb!==LY.sb){LY.idx=i;LY.sb=sb;LY.chg=now;byId.lyrics.dirty=true;updLyUI();}}}
 PV.tick=function(){const now=performance.now();if(now-lastT<6)return;const dt=Math.min(.1,(now-(lastT||now))/1000);lastT=now;
@@ -817,7 +855,7 @@ PV.tick=function(){const now=performance.now();if(now-lastT<6)return;const dt=Ma
 let uiT=0;
 function frame(){PV.tick();const now=performance.now();ndiPump(now);
  if(now-uiT>100){uiT=now;$('#tRead').textContent=tState().txt;
-  if(curView==='doc'&&D.ps)$('#docInfo').textContent=`Seite ${docPage()+1} / ${D.ps.n}`;
+  if(byId[curView]?.type==='doc')$('#docInfo').textContent=D.ps?`Seite ${docPage()+1} / ${D.ps.n}`:'–';
   if(curView==='lyrics')$('#lyTime').textContent=fmt(Math.max(0,Math.floor(lyPos())));
   for(const o of[...outputs])if(o.win&&o.win.closed){if(o.ndi){o.win=null;renderOuts();}else{outputs.splice(outputs.indexOf(o),1);renderOuts();saveSoon();}}}
  requestAnimationFrame(frame);}
@@ -826,7 +864,7 @@ function frame(){PV.tick();const now=performance.now();ndiPump(now);
 PV.key=function(e){const k=e.key;
  if(k==='b'||k==='B'||k==='.'){e.preventDefault();setBO(!BO);return;}
  const nx=['ArrowRight','ArrowDown','PageDown',' '].includes(k),pv=['ArrowLeft','ArrowUp','PageUp'].includes(k);if(!nx&&!pv)return;
- e.preventDefault();const d=nx?1:-1;if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
+ e.preventDefault();const d=nx?1:-1;if(clicker==='slides')slideGo(FS.idx+d,FS);else if(clicker==='doc')docGoto(docPage(FD)+d,FD);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
 document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select'))return;if(e.ctrlKey||e.metaKey||e.altKey)return;
  if(e.target.closest('button')&&(e.key===' '||e.key==='Enter'))return;PV.key(e);});
 
@@ -835,35 +873,40 @@ const idb={db:null,open(){return this.db||(this.db=new Promise((res,rej)=>{const
  async get(k){try{const db=await this.open();return await new Promise((res,rej)=>{const r=db.transaction('kv').objectStore('kv').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}catch(e){return null;}},
  async set(k,v){try{const db=await this.open();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){console.warn(e);}}};
 function snapshot(){return{app:'CueStack',v:1,res:resKey,clicker,T:{...T},
- D:{zoom:D.zoom,fit:D.fit,page:docPage()},S:{idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes},ST:{...ST},PR:{...PR},
+ DL:DL.map(d=>({zoom:d.zoom,fit:d.fit,page:docPage(d)})),SL:SL.map(S=>({idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes})),focus:{s:FS.n,d:FD.n},
+ S:{idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes},ST:{...ST},PR:{...PR},
  LY:{title:LY.title,lines:LY.lines,synced:LY.synced,idx:LY.idx,style:LY.style,size:LY.size,color:LY.color,offset:LY.offset},
  MIX:MIX.map(m=>({scenes:m.scenes,act:m.act,trans:m.trans,dur:m.dur,smart:m.smart})),MED:MED.map(m=>({fit:m.fit,loop:m.loop,audio:m.audio,restart:m.restart})),CAP:CAP.map(c=>c.fit),outs:outputs.map(o=>({src:o.src,bg:o.bg,ndi:o.ndi,win:!!o.win,name:o.ndiName}))};}
 let saveH=0;function saveSoon(){clearTimeout(saveH);saveH=setTimeout(()=>idb.set('state',snapshot()),600);}
-async function applySnap(j,docFiles,slideFiles){
+async function applySnap(j,getFiles){
  if(j.res&&RES[j.res])setRes(j.res);if(j.clicker){clicker=j.clicker;$('#clicker').value=clicker;}
  if(j.T)Object.assign(T,j.T);
- if(j.D){D.zoom=j.D.zoom||1;D.fit=j.D.fit||'width';}
- if(j.S)Object.assign(S,j.S,{prev:-1});if(j.ST)Object.assign(ST,j.ST);if(j.PR)Object.assign(PR,j.PR);
+ const dls=j.DL||(j.D?[j.D]:[]),sls=j.SL||(j.S?[j.S]:[]);
+ dls.forEach((v,i)=>{if(DL[i]&&v){DL[i].zoom=v.zoom||1;DL[i].fit=v.fit||'width';}});
+ sls.forEach((v,i)=>{if(SL[i]&&v){const{notes,...rest}=v;Object.assign(SL[i],rest,{prev:-1});}});if(j.ST)Object.assign(ST,j.ST);if(j.PR)Object.assign(PR,j.PR);
  if(j.LY){Object.assign(LY,j.LY,{playing:false,pos:0,blank:false,sb:false});renderLyList();updLyUI();}
  (j.MIX||[]).forEach((v,i)=>{const m=MIX[i];if(!m||!v)return;if(Array.isArray(v)){m.scenes=[newScene('Szene 1',v)];m.act=0;}
   else{m.scenes=v.scenes?.length?v.scenes:[newScene('Szene 1')];m.act=Math.min(v.act||0,m.scenes.length-1);m.trans=v.trans||'fade';m.dur=v.dur||.5;m.smart=v.smart!==false;}m.edit=m.act;m.prev=-1;});
  (j.MED||[]).forEach((v,i)=>{if(MED[i]&&v)Object.assign(MED[i],v);});(j.CAP||[]).forEach((f,i)=>{if(CAP[i])CAP[i].fit=f;});
  syncInputs();
- if(docFiles?.length)await setDocFiles(docFiles,j.D?.page||0);
- if(slideFiles?.length)await setSlideFiles(slideFiles,j.S?.idx||0,j.S?.notes);
- sources.forEach(s=>s.dirty=true);return j.outs||[];}
+ for(const d of DL){const f=await getFiles(docKey(d));if(f?.length)await setDocFiles(f,dls[d.n-1]?.page||0,d);}
+ for(const x of SL){const f=await getFiles(slideKey(x));if(f?.length)await setSlideFiles(f,sls[x.n-1]?.idx||0,sls[x.n-1]?.notes,x);}
+ if(j.focus){FS=SL[j.focus.s-1]||SL[0];FD=DL[j.focus.d-1]||DL[0];}
+ sources.forEach(s=>s.dirty=true);updSlideUI();return j.outs||[];}
 const toB64=buf=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(new Blob([buf]));});
 function fromB64(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
 async function exportShow(){const j=snapshot();const enc=async fs=>Promise.all(fs.map(async f=>({name:f.name,type:f.type,notes:f.notes||null,b64:await toB64(f.bytes)})));
- j.files={doc:await enc(D.files),slides:await enc(S.files),media:await Promise.all(MED.map(async m=>m.file?(await enc([m.file]))[0]:null))};
+ j.files={media:await Promise.all(MED.map(async m=>m.file?(await enc([m.file]))[0]:null))};
+ for(const d of DL)j.files[d.id]=await enc(d.files);for(const x of SL)j.files[x.id]=await enc(x.files);
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(j)],{type:'application/json'}));
  const d=new Date();a.download=`Show_${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.cuestack`;
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Show gespeichert.');}
 async function importShow(file){try{const j=JSON.parse(await file.text());if(j.app!=='CueStack')throw new Error('Keine CueStack-Showdatei.');
  const dec=fs=>(fs||[]).map(f=>({name:f.name,type:f.type,notes:f.notes||null,bytes:fromB64(f.b64)}));
- const df=dec(j.files?.doc),sf=dec(j.files?.slides);
- D.files=[];D.ps=null;S.files=[];S.ps=null;$('#thumbs').innerHTML='';
- const outs=await applySnap(j,df,sf);if(!df.length){idb.set('docFiles',[]);docLayout();}if(!sf.length)idb.set('slideFiles',[]);
+ for(const d of DL){d.files=[];d.ps=null;d.L=[];d.total=0;byId[d.id].dirty=true;idb.set(docKey(d),[]);}
+ for(const x of SL){if(x.ps)x.ps.dispose();x.files=[];x.ps=null;x.notes=[];x.idx=0;byId[x.id].dirty=true;idb.set(slideKey(x),[]);}$('#thumbs').innerHTML='';
+ const byKey={};for(const d of DL)byKey[docKey(d)]=dec(j.files?.[d.id]);for(const x of SL)byKey[slideKey(x)]=dec(j.files?.[x.id]);
+ const outs=await applySnap(j,async k=>byKey[k]);updSlidePanel();updDocUI();
  const mf=j.files?.media||[];for(let i=0;i<MED.length;i++){const f=mf[i];if(f)await medLoad(MED[i],dec([f])[0]);else{medClear(MED[i]);}}saveMedia();
  saveSoon();offerOuts(outs);toast('Show geladen.');}catch(e){toast('Laden fehlgeschlagen: '+e.message);}}
 function offerOuts(outs){outs=outs.filter(o=>!outputs.some(x=>x.src===o.src));if(!outs.length)return;
@@ -873,19 +916,20 @@ function offerOuts(outs){outs=outs.filter(o=>!outputs.some(x=>x.src===o.src));if
 /* ---------- UI ---------- */
 function setRes(k){resKey=k;[W,H]=RES[k];for(const s of sources){s.canvas.width=W;s.canvas.height=H;s.dirty=true;s.key='';}docLayout();$('#res').value=k;}
 function show(v){curView=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));const s=byId[v];
- const pid=s.type==='cap'?'cap':s.type==='mix'?'mix':s.type==='med'?'med':v;$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+pid));
+ const pid=s.type==='cap'?'cap':s.type==='mix'?'mix':s.type==='med'?'med':s.type==='slides'?'slides':s.type==='doc'?'doc':v;
+ if(s.type==='slides'){S=s.st;updSlidePanel();}if(s.type==='doc'){D=s.st;updDocUI();}$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+pid));
  const pv=$('#pv-'+pid);pv.querySelectorAll('canvas').forEach(c=>c.remove());pv.prepend(s.canvas);s.dirty=true;
  if(s.type==='cap'){$('#capTitle').textContent=s.name;updCapUI();}if(s.type==='mix'){$('#mixTitle').textContent=s.name;renderMix();}if(s.type==='med')updMedUI();
- if(v==='slides')drawNext();}
+ }
 function updCapUI(){const s=byId[curView];if(!s||s.type!=='cap')return;$('#capLabel').textContent=s.label||'Keine Quelle';$('#capEmpty').style.display=s.video?'none':'';$('#capFit').value=s.fit;$('#capStop').disabled=!s.video;}
+function syncSlideInputs(){$('#slAudio').checked=S.audio;$('#slVidNext').checked=S.vidNext;$('#slVidLoop').checked=S.vidLoop;
+ $('#slTrans').value=S.trans;$('#slDur').value=S.dur;$('#slFit').value=S.fit;$('#slAuto').checked=S.auto;$('#slInt').value=S.interval;$('#slLoop').checked=S.loop;}
 function syncInputs(){
  $('#tDur').value=fmt(T.dur);$('#tW1').value=T.warn1;$('#tW2').value=T.warn2;$('#tC0').value=T.c0;$('#tC1').value=T.c1;$('#tC2').value=T.c2;$('#tBg').value=T.bg;
  $('#tMsg').value=T.msg;$('#tLabel').value=T.label;$('#tOver').checked=T.overrun;$('#tBar').checked=T.bar;updTimerUI();
- $$('#docFit button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===D.fit));$('#docZoom').textContent=Math.round(D.zoom*100)+' %';
- $('#slAudio').checked=S.audio;$('#slVidNext').checked=S.vidNext;$('#slVidLoop').checked=S.vidLoop;
+ updDocUI();syncSlideInputs();
  $('#prSize').value=PR.size;$('#prRun').textContent=PR.started?'Laufzeit stoppen':'Laufzeit starten';
  $('#stMsg').value=ST.msg;$('#stBlink').checked=ST.blink;$('#stSl').checked=ST.slides;$('#stLy').checked=ST.lyrics;
- $('#slTrans').value=S.trans;$('#slDur').value=S.dur;$('#slFit').value=S.fit;$('#slAuto').checked=S.auto;$('#slInt').value=S.interval;$('#slLoop').checked=S.loop;
  $('#lySty').value=LY.style;$('#lySize').value=LY.size;$('#lyOff').value=LY.offset;if(LY.color)$('#lyCol').value=LY.color;}
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.v);});
 $$('.toOut').forEach(b=>b.addEventListener('click',()=>{const v=$('#scrSel').value;openOutput(curView,v===''?null:+v);}));
@@ -896,7 +940,7 @@ $('#saveShow').onclick=exportShow;
 $('#loadShow').onclick=()=>$('#loadFile').click();
 $('#loadFile').onchange=e=>{const f=e.target.files[0];if(f)importShow(f);e.target.value='';};
 $('#newShow').onclick=async()=>{const b=$('#newShow');if(!b.dataset.arm){b.dataset.arm=1;b.textContent='Wirklich leeren?';setTimeout(()=>{delete b.dataset.arm;b.textContent='Neue Show';},3000);return;}
- delete b.dataset.arm;b.textContent='Neue Show';await idb.set('state',null);await idb.set('docFiles',[]);await idb.set('slideFiles',[]);location.reload();};
+ delete b.dataset.arm;b.textContent='Neue Show';await idb.set('state',null);for(const d of DL)await idb.set(docKey(d),[]);for(const x of SL)await idb.set(slideKey(x),[]);await idb.set('mediaFiles',[]);location.reload();};
 $('#restoreX').onclick=()=>$('#restore').classList.remove('on');
 $('#addSrc').innerHTML=srcOptions('slides');
 $('#addOut').onclick=()=>{const v=$('#scrSel').value;openOutput($('#addSrc').value,v===''?null:+v);};
@@ -921,25 +965,25 @@ $('#tOver').onchange=e=>{T.overrun=e.target.checked;byId.timer.dirty=true;saveSo
 $('#docOpen').onclick=()=>$('#docFile').click();
 $('#docFile').onchange=async e=>{setDocFiles(await readFiles(e.target.files));e.target.value='';};
 $('#docPrev').onclick=()=>docGoto(docPage()-1);$('#docNext').onclick=()=>docGoto(docPage()+1);
-$('#docUp').onclick=()=>{D.target-=H*.4;byId.doc.dirty=true;};$('#docDn').onclick=()=>{D.target+=H*.4;byId.doc.dirty=true;};
+$('#docUp').onclick=()=>{D.target-=H*.4;byId[D.id].dirty=true;};$('#docDn').onclick=()=>{D.target+=H*.4;byId[D.id].dirty=true;};
 $('#docTop').onclick=()=>docGoto(0);
 $('#docJump').onchange=e=>docGoto((+e.target.value||1)-1);
-$('#docFit').onclick=e=>{const b=e.target.closest('button');if(!b)return;D.fit=b.dataset.f;D.zoom=1;syncInputs();docZoom(1);};
+$('#docFit').onclick=e=>{const b=e.target.closest('button');if(!b)return;D.fit=b.dataset.f;D.zoom=1;updDocUI();docZoom(1);};
 $('#docZi').onclick=()=>docZoom(D.zoom*1.15);$('#docZo').onclick=()=>docZoom(D.zoom/1.15);
-$('#docSpeed').oninput=e=>{D.speed=+e.target.value;};
-$('#pv-doc').addEventListener('wheel',e=>{if(!D.ps)return;e.preventDefault();D.target+=e.deltaY*H/$('#pv-doc').clientHeight;byId.doc.dirty=true;},{passive:false});
+$('#docSpeed').oninput=e=>{D.speed=+e.target.value;FD=D;};
+$('#pv-doc').addEventListener('wheel',e=>{if(!D.ps)return;e.preventDefault();D.target+=e.deltaY*H/$('#pv-doc').clientHeight;byId[D.id].dirty=true;},{passive:false});
 /* Folien */
 $('#slOpen').onclick=()=>$('#slFile').click();
 $('#slFile').onchange=async e=>{setSlideFiles(await readFiles(e.target.files,true));e.target.value='';};
 $('#slAudio').onchange=e=>{S.audio=e.target.checked;const v=curVideo();if(v)v.muted=!S.audio;saveSoon();};
 $('#slVidNext').onchange=e=>{S.vidNext=e.target.checked;saveSoon();};
 $('#slVidLoop').onchange=e=>{S.vidLoop=e.target.checked;const v=curVideo();if(v)v.loop=S.vidLoop;saveSoon();};
-$('#slVidPlay').onclick=()=>{const v=curVideo();if(!v){toast('Aktuelle Folie ist kein Video.');return;}if(v.paused){v.muted=!S.audio;v.play().catch(()=>{});}else v.pause();byId.slides.dirty=true;};
+$('#slVidPlay').onclick=()=>{const v=curVideo();if(!v){toast('Aktuelle Folie ist kein Video.');return;}if(v.paused){v.muted=!S.audio;v.play().catch(()=>{});}else v.pause();byId[S.id].dirty=true;};
 $('#slVidRe').onclick=()=>{if(curVideo())startVideo(S.idx);};
 $('#slPrev').onclick=()=>slideGo(S.idx-1);$('#slNext').onclick=()=>slideGo(S.idx+1);
 $('#thumbs').onclick=e=>{const b=e.target.closest('.th');if(b)slideGo(+b.dataset.i);};
 $('#slTrans').onchange=e=>{S.trans=e.target.value;saveSoon();};$('#slDur').onchange=e=>{S.dur=Math.max(.1,+e.target.value||.6);saveSoon();};
-$('#slFit').onchange=e=>{S.fit=e.target.value;byId.slides.dirty=true;saveSoon();};
+$('#slFit').onchange=e=>{S.fit=e.target.value;byId[S.id].dirty=true;saveSoon();};
 $('#slAuto').onchange=e=>{S.auto=e.target.checked;S.lastAuto=Date.now();saveSoon();};$('#slInt').onchange=e=>{S.interval=Math.max(1,+e.target.value||8);saveSoon();};
 $('#slLoop').onchange=e=>{S.loop=e.target.checked;drawNext();saveSoon();};
 /* Drag & Drop */
@@ -969,12 +1013,12 @@ $('#lySearch').onsubmit=async e=>{e.preventDefault();const q=$('#lyQ').value.tri
  }catch(err){ul.innerHTML='';toast('Suche nicht möglich (Internet?): '+err.message);}};
 $('#lyRes').onclick=e=>{const b=e.target.closest('button');if(!b)return;const s=lyResults[+b.dataset.i];const txt=s.syncedLyrics||s.plainLyrics;if(!txt){toast('Für diesen Eintrag gibt es keinen Text.');return;}setLyrics(`${s.trackName} – ${s.artistName}`,txt);};
 /* Referent */
-$('#prPrev').onclick=()=>slideGo(S.idx-1);$('#prNext').onclick=()=>slideGo(S.idx+1);
+$('#prPrev').onclick=()=>slideGo(FS.idx-1,FS);$('#prNext').onclick=()=>slideGo(FS.idx+1,FS);
 $('#prRun').onclick=()=>{PR.started=PR.started?0:Date.now();$('#prRun').textContent=PR.started?'Laufzeit stoppen':'Laufzeit starten';byId.presenter.dirty=true;saveSoon();};
 $('#prSize').oninput=e=>{PR.size=+e.target.value;byId.presenter.dirty=true;saveSoon();};
-$('#prNotes').addEventListener('input',e=>{if(!S.ps)return;S.notes[S.idx]=e.target.value;byId.presenter.dirty=true;saveSoon();});
+$('#prNotes').addEventListener('input',e=>{const S=FS;if(!S.ps)return;S.notes[S.idx]=e.target.value;byId.presenter.dirty=true;saveSoon();});
 $('#prPptx').onclick=()=>$('#prPptxFile').click();
-$('#prPptxFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(!S.ps){toast('Erst die Folien (PDF) laden.');return;}
+$('#prPptxFile').onchange=async e=>{const S=FS;const f=e.target.files[0];e.target.value='';if(!f)return;if(!S.ps){toast('Erst die Folien (PDF) laden.');return;}
  try{const ns=await pptxNotes(await f.arrayBuffer());for(let i=0;i<S.ps.n;i++)if(ns[i])S.notes[i]=ns[i];updSlideUI();saveSoon();
   toast(`${ns.filter(Boolean).length} Notizen übernommen`+(ns.length!==S.ps.n?` (PPTX hat ${ns.length} Folien, geladen sind ${S.ps.n})`:'.'));}catch(err){toast('Notizen konnten nicht gelesen werden: '+err.message);}};
 /* Stage */
@@ -1024,14 +1068,15 @@ window.addEventListener('beforeunload',()=>{idb.set('state',snapshot());});
 
 /* ---------- FERNSTEUERUNG (Companion / HTTP, Desktop-App) ---------- */
 PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowerCase();const n=v=>Number(v);
- const go=d=>{if(clicker==='slides')slideGo(S.idx+d);else if(clicker==='doc')docGoto(docPage()+d);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
+ const go=d=>{if(clicker==='slides')slideGo(FS.idx+d,FS);else if(clicker==='doc')docGoto(docPage(FD)+d,FD);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
  const mixOf=()=>byId['mix'+(p.m||1)];
+ const sk=()=>p.d?(SL[n(p.d)-1]||FS):FS,dk=()=>p.d?(DL[n(p.d)-1]||FD):FD;
  switch(cmd){
   case'next':case'go/next':go(1);break;case'prev':case'go/prev':go(-1);break;
-  case'slides/next':slideGo(S.idx+1);break;case'slides/prev':slideGo(S.idx-1);break;case'slides/goto':slideGo(n(p.n)-1);break;
-  case'slides/video':{const v=curVideo();if(v){if(v.paused)v.play().catch(()=>{});else v.pause();}break;}
-  case'doc/next':docGoto(docPage()+1);break;case'doc/prev':docGoto(docPage()-1);break;case'doc/goto':docGoto(n(p.n)-1);break;
-  case'doc/scroll':D.target+=n(p.px||200);byId.doc.dirty=true;break;
+  case'slides/next':{const k=sk();slideGo(k.idx+1,k);break;}case'slides/prev':{const k=sk();slideGo(k.idx-1,k);break;}case'slides/goto':{const k=sk();slideGo(n(p.n)-1,k);break;}
+  case'slides/video':{const v=curVideo(sk());if(v){if(v.paused)v.play().catch(()=>{});else v.pause();}break;}
+  case'doc/next':{const k=dk();docGoto(docPage(k)+1,k);break;}case'doc/prev':{const k=dk();docGoto(docPage(k)-1,k);break;}case'doc/goto':{const k=dk();docGoto(n(p.n)-1,k);break;}
+  case'doc/scroll':{const k=dk();k.target+=n(p.px||200);byId[k.id].dirty=true;FD=k;break;}
   case'lyrics/next':lyStep(1);break;case'lyrics/prev':lyStep(-1);break;case'lyrics/play':$('#lyPlay').click();break;
   case'lyrics/pause':$('#lyPause').click();break;case'lyrics/stop':$('#lyStop').click();break;case'lyrics/blank':$('#lyBlank').click();break;
   case'timer/start':if(!T.running)tToggle();break;case'timer/pause':if(T.running)tToggle();break;case'timer/toggle':tToggle();break;case'timer/reset':tReset();break;
@@ -1049,7 +1094,8 @@ PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowe
  saveSoon();return{ok:true,state:PV.state()};};
 PV.state=function(){const ts=tState();return{blackout:BO,clicker,
  timer:{text:ts.txt,running:T.running,mode:T.mode,remaining:T.mode==='down'?Math.ceil(T.dur-tEl()):null,overtime:!!ts.up},
- slides:{n:S.ps?S.idx+1:0,total:S.ps?S.ps.n:0,video:!!curVideo()},doc:{page:D.ps?docPage()+1:0,total:D.ps?D.ps.n:0},
+ slides:{deck:FS.n,n:FS.ps?FS.idx+1:0,total:FS.ps?FS.ps.n:0,video:!!curVideo(FS),note:FS.ps?(FS.notes[FS.idx]||''):''},doc:{deck:FD.n,page:FD.ps?docPage(FD)+1:0,total:FD.ps?FD.ps.n:0},
+ decks:SL.map(x=>({deck:x.n,n:x.ps?x.idx+1:0,total:x.ps?x.ps.n:0,name:x.files[0]?.name||''})),
  mix:MIX.map(m=>({scene:m.act+1,name:m.scenes[m.act]?.name||'',total:m.scenes.length})),
  lyrics:{title:LY.title,line:LY.idx>=0?(LY.lines[LY.idx]?.text||''):'',playing:LY.playing},stage:{message:ST.msg},
  outputs:outputs.map(o=>({id:o.id,source:o.src,ndi:o.ndi,window:!!o.win}))};};
@@ -1081,7 +1127,7 @@ async function initNative(){const nb=$('#nativeBox');
 /* ---------- START ---------- */
 (async()=>{show('timer');syncInputs();requestAnimationFrame(frame);try{await initNative();}catch(e){console.error(e);}
  const st=await idb.get('state');if(!st)return;
- const outs=await applySnap(st,await idb.get('docFiles'),await idb.get('slideFiles'));
+ const outs=await applySnap(st,k=>idb.get(k));
  const mf=await idb.get('mediaFiles');if(Array.isArray(mf))for(let i=0;i<MED.length;i++)if(mf[i])await medLoad(MED[i],mf[i]);
  show(curView);toast('Letzte Sitzung wiederhergestellt.');offerOuts(outs);})();
 }

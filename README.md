@@ -64,7 +64,7 @@ npm start       # Desktop-App starten
 npm run dist    # Installer bauen (Ausgabe in dist/)
 ```
 
-Ein Tag `v*` (z. B. `v1.0.1`) baut auf GitHub automatisch Windows- und Mac-Installer und hängt sie an ein Release. Änderungen in `web/` gehen automatisch auf GitHub Pages.
+Jeder Push auf `main` baut auf GitHub automatisch Windows- und Mac-Installer und hängt sie an das Release zur Version aus `package.json` (Version erhöhen = neues Release). Änderungen in `web/` gehen automatisch auf GitHub Pages.
 
 ## Lizenzen
 

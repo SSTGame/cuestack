@@ -49,7 +49,7 @@ Modul **Generic HTTP** anlegen, Basis-URL `http://<IP-des-CueStack-Rechners>:987
 | `blackout/toggle`, `blackout/on`, `blackout/off` | Blackout |
 | `stage/message?text=Noch%205%20Minuten`, `stage/clear` | Nachricht auf Stage-Monitor |
 | `mix/next?m=1`, `mix/prev?m=1`, `mix/scene?m=1&s=3`, `mix/step?m=1` | Mix-Szenen schalten (`step` blättert erst durch Folien/Dokument) |
-| `clicker?target=slides\|doc\|lyrics\|mix1` | Ziel des Clickers |
+| `clicker?target=auto\|slides\|doc\|lyrics\|mix1` | Ziel des Clickers |
 | `state` | Status als JSON (Timer-Text, Folie, Blackout …) – für Companion-Feedbacks/Variablen |
 
 GET und POST funktionieren beide. Port ändern: Umgebungsvariable `CUESTACK_PORT`. Nur lokal erreichbar machen: `CUESTACK_HOST=127.0.0.1`.

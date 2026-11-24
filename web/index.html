@@ -108,7 +108,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <label title="Ausgabe-Auflösung">Auflösung
   <select id="res"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K (2160p)</option></select></label>
  <label title="Was steuert der Presenter-Clicker / die Pfeiltasten?">Clicker steuert
-  <select id="clicker"><option value="slides">Folien (zuletzt aktiv)</option><option value="doc">Dokument (zuletzt aktiv)</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
+  <select id="clicker"><option value="auto">Automatisch (was live ist)</option><option value="slides">Folien (zuletzt aktiv)</option><option value="doc">Dokument (zuletzt aktiv)</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
  <div class="sp"></div>
  <button id="newShow">Neue Show</button>
  <button id="loadShow">Show öffnen…</button><input type="file" id="loadFile" accept=".cuestack,.json" hidden>
@@ -363,7 +363,7 @@ const PDFJS_PATHS=['./vendor/pdfjs/','https://cdnjs.cloudflare.com/ajax/libs/pdf
 const NATIVE=window.CueNative||null;
 const RELEASES='https://github.com/SSTGame/cuestack/releases/latest';
 const RES={'720':[1280,720],'1080':[1920,1080],'1440':[2560,1440],'2160':[3840,2160]};
-let resKey='1080',W=1920,H=1080,clicker='slides',curView='timer';
+let resKey='1080',W=1920,H=1080,clicker='auto',curView='timer';
 const PV=window.PV={};
 const sources=[],byId={};
 const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
@@ -864,22 +864,38 @@ function frame(){PV.tick();const now=performance.now();ndiPump(now);
 PV.key=function(e){const k=e.key;
  if(k==='b'||k==='B'||k==='.'){e.preventDefault();setBO(!BO);return;}
  const nx=['ArrowRight','ArrowDown','PageDown',' '].includes(k),pv=['ArrowLeft','ArrowUp','PageUp'].includes(k);if(!nx&&!pv)return;
- e.preventDefault();const d=nx?1:-1;if(clicker==='slides')slideGo(FS.idx+d,FS);else if(clicker==='doc')docGoto(docPage(FD)+d,FD);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
-document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select'))return;if(e.ctrlKey||e.metaKey||e.altKey)return;
- if(e.target.closest('button')&&(e.key===' '||e.key==='Enter'))return;PV.key(e);});
+ e.preventDefault();clickStep(nx?1:-1);};
+/* Was schaltet der Clicker? „auto“: der Mix auf einem Ausgang, sonst die Quelle auf dem Ausgang, sonst die gerade geöffnete Ansicht */
+function clickTarget(){if(clicker!=='auto')return byId[clicker]||clicker;
+ const cand=[...outputs.map(o=>byId[o.src]),byId[curView]].filter(Boolean);
+ return cand.find(x=>x.type==='mix')||cand.find(x=>['slides','doc','lyrics'].includes(x.type))||(cand.find(x=>x.type==='presenter'||x.type==='stage')&&byId[FS.id])||byId[FS.id];}
+function clickStep(d){const t=clickTarget();
+ if(t==='slides')slideGo(FS.idx+d,FS);else if(t==='doc')docGoto(docPage(FD)+d,FD);else if(t==='lyrics')lyStep(d);
+ else if(t?.type==='mix')mixStep(t,d);else if(t?.type==='slides')slideGo(t.st.idx+d,t.st);else if(t?.type==='doc')docGoto(docPage(t.st)+d,t.st);else if(t?.type==='lyrics')lyStep(d);
+ else slideGo(FS.idx+d,FS);}
+/* Clicker-Tasten (Bild auf/ab, Blackout) wirken immer – auch wenn ein Dropdown oder Knopf den Fokus hat. Nur in Textfeldern nicht. */
+document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const k=e.key,t=e.target;
+ const typing=t.closest('textarea')||(t.closest('input')&&!/^(checkbox|radio|range|color|button|submit|file)$/i.test(t.type||''));
+ const clickerKey=k==='PageDown'||k==='PageUp';
+ if(typing&&!clickerKey)return;if(t.closest('textarea')&&clickerKey)return;
+ if(t.closest('select')&&!clickerKey&&k!=='b'&&k!=='B'&&k!=='.')return;
+ if(t.closest('button')&&(k===' '||k==='Enter'))return;
+ PV.key(e);if(clickerKey&&t.closest('select,input'))t.blur();},true);
+/* Nach Auswahl in Dropdowns den Fokus freigeben, damit Pfeiltasten wieder schalten */
+document.addEventListener('change',e=>{if(e.target.matches('select'))e.target.blur();});
 
 /* ---------- SPEICHERN ---------- */
 const idb={db:null,open(){return this.db||(this.db=new Promise((res,rej)=>{const r=indexedDB.open('cuestack',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));},
  async get(k){try{const db=await this.open();return await new Promise((res,rej)=>{const r=db.transaction('kv').objectStore('kv').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}catch(e){return null;}},
  async set(k,v){try{const db=await this.open();await new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){console.warn(e);}}};
-function snapshot(){return{app:'CueStack',v:1,res:resKey,clicker,T:{...T},
+function snapshot(){return{app:'CueStack',v:1,cv:2,res:resKey,clicker,T:{...T},
  DL:DL.map(d=>({zoom:d.zoom,fit:d.fit,page:docPage(d)})),SL:SL.map(S=>({idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes})),focus:{s:FS.n,d:FD.n},
  S:{idx:S.idx,trans:S.trans,dur:S.dur,auto:S.auto,interval:S.interval,loop:S.loop,fit:S.fit,audio:S.audio,vidNext:S.vidNext,vidLoop:S.vidLoop,notes:S.notes},ST:{...ST},PR:{...PR},
  LY:{title:LY.title,lines:LY.lines,synced:LY.synced,idx:LY.idx,style:LY.style,size:LY.size,color:LY.color,offset:LY.offset},
  MIX:MIX.map(m=>({scenes:m.scenes,act:m.act,trans:m.trans,dur:m.dur,smart:m.smart})),MED:MED.map(m=>({fit:m.fit,loop:m.loop,audio:m.audio,restart:m.restart})),CAP:CAP.map(c=>c.fit),outs:outputs.map(o=>({src:o.src,bg:o.bg,ndi:o.ndi,win:!!o.win,name:o.ndiName}))};}
 let saveH=0;function saveSoon(){clearTimeout(saveH);saveH=setTimeout(()=>idb.set('state',snapshot()),600);}
 async function applySnap(j,getFiles){
- if(j.res&&RES[j.res])setRes(j.res);if(j.clicker){clicker=j.clicker;$('#clicker').value=clicker;}
+ if(j.res&&RES[j.res])setRes(j.res);if(j.clicker){clicker=j.cv>=2?j.clicker:(/^mix/.test(j.clicker)?j.clicker:'auto');$('#clicker').value=clicker;}
  if(j.T)Object.assign(T,j.T);
  const dls=j.DL||(j.D?[j.D]:[]),sls=j.SL||(j.S?[j.S]:[]);
  dls.forEach((v,i)=>{if(DL[i]&&v){DL[i].zoom=v.zoom||1;DL[i].fit=v.fit||'width';}});
@@ -1068,7 +1084,7 @@ window.addEventListener('beforeunload',()=>{idb.set('state',snapshot());});
 
 /* ---------- FERNSTEUERUNG (Companion / HTTP, Desktop-App) ---------- */
 PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowerCase();const n=v=>Number(v);
- const go=d=>{if(clicker==='slides')slideGo(FS.idx+d,FS);else if(clicker==='doc')docGoto(docPage(FD)+d,FD);else if(byId[clicker]?.type==='mix')mixStep(byId[clicker],d);else lyStep(d);};
+ const go=d=>clickStep(d);
  const mixOf=()=>byId['mix'+(p.m||1)];
  const sk=()=>p.d?(SL[n(p.d)-1]||FS):FS,dk=()=>p.d?(DL[n(p.d)-1]||FD):FD;
  switch(cmd){
@@ -1088,7 +1104,7 @@ PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowe
   case'mix/scene':{const m=mixOf();if(m)sceneGo(m,n(p.s)-1);break;}
   case'mix/next':{const m=mixOf();if(m)sceneGo(m,m.act+1);break;}case'mix/prev':{const m=mixOf();if(m)sceneGo(m,m.act-1);break;}
   case'mix/step':{const m=mixOf();if(m)mixStep(m,n(p.d)||1);break;}
-  case'clicker':if(['slides','doc','lyrics','mix1','mix2','mix3','mix4'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
+  case'clicker':if(['auto','slides','doc','lyrics','mix1','mix2','mix3','mix4'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
   case'state':break;
   default:return{ok:false,error:'Unbekannter Befehl: '+cmd};}
  saveSoon();return{ok:true,state:PV.state()};};

@@ -14,6 +14,7 @@ Alle Cues einer Show in einer App: **Timer, PowerPoint/PDF-Folien mit Videoclips
 | **iPhone-Fotos (HEIC/HEIF)** werden automatisch umgewandelt | ✓ | ✓ |
 | Videoclips (MP4/WebM) zwischen den Folien | ✓ | ✓ |
 | **PowerPoint (.pptx), Word, Excel direkt öffnen** | – (als PDF exportieren) | ✓ |
+| **PowerPoint live**: echte Bildschirmpräsentation mit allen Animationen/Effekten, ferngesteuert per Clicker/Companion | – | ✓ |
 | Referentenansicht mit Sprechernotizen aus der .pptx | ✓ | ✓ (automatisch) |
 | Stage-Monitor mit Nachrichten an die Bühne | ✓ | ✓ |
 | **4 Dokumente** mit weichem Scrollen, Zoom, Teleprompter | ✓ | ✓ |
@@ -32,7 +33,9 @@ Alle Cues einer Show in einer App: **Timer, PowerPoint/PDF-Folien mit Videoclips
 
 **Mac (Apple Silicon M1–M4):** `.dmg` öffnen, CueStack in „Programme“ ziehen. Beim ersten Start: Rechtsklick auf die App → **Öffnen**. Falls macOS „beschädigt“ meldet: Terminal öffnen und `xattr -cr /Applications/CueStack.app` eingeben. Für Intel-Macs bitte die Web-Version nutzen.
 
-**PowerPoint öffnen:** Windows nutzt das installierte Microsoft PowerPoint (wie PV Cue), der Mac nutzt Keynote. Fehlt beides, springt das kostenlose [LibreOffice](https://de.libreoffice.org/) ein. Folien werden als Standbilder übernommen, PowerPoint-Animationen also nicht. Sprechernotizen landen automatisch in der Referentenansicht.
+**PowerPoint als Folien:** Windows nutzt das installierte Microsoft PowerPoint, der Mac Microsoft PowerPoint oder Keynote. Fehlt das, springt das kostenlose [LibreOffice](https://de.libreoffice.org/) ein. Folien werden dabei Standbilder (ideal für Mix-Szenen, NDI, Stage-Monitor). Sprechernotizen landen automatisch in der Referentenansicht. Mac: beim ersten Mal die Rückfragen „CueStack möchte PowerPoint steuern“ und ggf. „auf Daten anderer Apps zugreifen“ erlauben.
+
+**PowerPoint live (mit Effekten):** Modul „PowerPoint live“ startet die Präsentation im echten PowerPoint (Windows) bzw. PowerPoint/Keynote (Mac) – alle Animationen, Übergänge und Videos laufen original. CueStack steuert sie per Clicker, Companion (`ppt/next`, `ppt/prev`, `ppt/goto?n=3`, `ppt/black`, `ppt/end`) und BLACKOUT und zeigt die Notizen in der Referentenansicht. Für NDI oder Mix-Szenen den PowerPoint-Bildschirm in einen Capture-Slot holen.
 
 ## Bitfocus Companion
 

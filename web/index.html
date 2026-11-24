@@ -108,7 +108,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <label title="Ausgabe-Auflösung">Auflösung
   <select id="res"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K (2160p)</option></select></label>
  <label title="Was steuert der Presenter-Clicker / die Pfeiltasten?">Clicker steuert
-  <select id="clicker"><option value="auto">Automatisch (was live ist)</option><option value="slides">Folien (zuletzt aktiv)</option><option value="doc">Dokument (zuletzt aktiv)</option><option value="lyrics">Lyrics</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
+  <select id="clicker"><option value="auto">Automatisch (was live ist)</option><option value="slides">Folien (zuletzt aktiv)</option><option value="doc">Dokument (zuletzt aktiv)</option><option value="lyrics">Lyrics</option><option value="pptlive">PowerPoint live</option><option value="mix1">Mix 1 – Szenen</option><option value="mix2">Mix 2 – Szenen</option><option value="mix3">Mix 3 – Szenen</option><option value="mix4">Mix 4 – Szenen</option></select></label>
  <div class="sp"></div>
  <button id="newShow">Neue Show</button>
  <button id="loadShow">Show öffnen…</button><input type="file" id="loadFile" accept=".cuestack,.json" hidden>
@@ -128,6 +128,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <button data-v="slides2">Folien 2 <span class="live">LIVE</span></button>
  <button data-v="slides3">Folien 3 <span class="live">LIVE</span></button>
  <button data-v="slides4">Folien 4 <span class="live">LIVE</span></button>
+ <button data-v="pptlive" id="navPpt">PowerPoint live <span class="live">LIVE</span></button>
  <h4>Dokumente / PDF</h4>
  <button data-v="doc">Dokument 1 <span class="live">LIVE</span></button>
  <button data-v="doc2">Dokument 2 <span class="live">LIVE</span></button>
@@ -254,6 +255,29 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
     <details><summary>Text einfügen</summary><textarea id="lyText" rows="6" placeholder="Strophen durch Leerzeile trennen – oder LRC/SRT einfügen"></textarea><button id="lyApply" style="margin-top:6px">Übernehmen</button></details>
    </div>
   </div>
+ </section>
+
+ <!-- POWERPOINT LIVE -->
+ <section class="panel" id="p-pptlive">
+  <div class="ph"><h2>PowerPoint live</h2><span class="read" id="plRead" style="font-size:28px">–</span></div>
+  <div class="box" style="margin-top:0">
+   <p style="margin-top:0">Spielt die Präsentation <b>im echten PowerPoint</b> ab – mit allen Animationen, Übergängen, Videos und Klick-Effekten. CueStack steuert sie: Clicker, Companion, Blackout, Notizen in der Referentenansicht.</p>
+   <div id="plWeb" class="hint" style="display:none">Nur in der Desktop-App verfügbar (Windows mit Microsoft PowerPoint, Mac mit PowerPoint oder Keynote). <a id="plDl" style="color:var(--ac)" target="_blank" rel="noopener">Desktop-App herunterladen</a></div>
+   <div id="plNative">
+    <div class="row" style="margin-top:0">
+     <button id="plOpen">Präsentation wählen…</button><input type="file" id="plFile" accept=".pptx,.ppsx,.ppt,.pps,.key" hidden>
+     <span class="hint" id="plName">Keine Datei</span></div>
+    <div class="row">
+     <label style="flex:1">Auf Bildschirm (Windows)<select id="plScr"><option value="">PowerPoint-Einstellung verwenden</option></select></label>
+     <button id="plStart" class="pri big">▶ Präsentation starten</button></div>
+    <div class="row">
+     <button id="plPrev" class="big">◀ Zurück</button><button id="plNext" class="big pri">Weiter ▶</button>
+     <button id="plBlack" aria-pressed="false">Schwarz</button><button id="plEnd">Beenden</button></div>
+    <p class="hint" id="plStatus">Nicht gestartet.</p>
+   </div>
+  </div>
+  <div class="box"><h3>Notizen zur aktuellen Folie</h3><div id="plNotes" style="white-space:pre-wrap;font-size:18px;min-height:60px" class="hint">–</div></div>
+  <p class="hint">Weiter mit Effekten heißt: Jeder Klick löst die nächste Animation aus, wie in PowerPoint. Für NDI oder einen Mix den PowerPoint-Bildschirm in einen Capture-Slot holen. Mac: Den Bildschirm für die Präsentation in PowerPoint unter „Bildschirmpräsentation“ einstellen; beim ersten Start die Rückfrage „CueStack möchte PowerPoint steuern“ erlauben.</p>
  </section>
 
  <!-- REFERENT -->
@@ -438,11 +462,11 @@ async function unzip(buf,wanted){const u8=buf instanceof Uint8Array?buf:new Uint
   const st=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),data=u8.subarray(st,st+cs);let b;
   if(m===0)b=data;else if(m===8)b=new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());else continue;
   out.set(name,td.decode(b));}return out;}
-async function pptxNotes(buf){const F=await unzip(buf,n=>/^ppt\/(presentation\.xml|_rels\/presentation\.xml\.rels|slides\/[^/]+\.xml|slides\/_rels\/[^/]+\.rels|notesSlides\/[^/]+\.xml)$/.test(n));
+async function pptxNotes(buf,all=false){const F=await unzip(buf,n=>/^ppt\/(presentation\.xml|_rels\/presentation\.xml\.rels|slides\/[^/]+\.xml|slides\/_rels\/[^/]+\.rels|notesSlides\/[^/]+\.xml)$/.test(n));
  const P=new DOMParser(),X=s=>P.parseFromString(s||'<x/>','application/xml'),pres=X(F.get('ppt/presentation.xml')),rels=X(F.get('ppt/_rels/presentation.xml.rels'));
  const rm={};for(const r of rels.getElementsByTagName('Relationship'))rm[r.getAttribute('Id')]=r.getAttribute('Target');
  const res=[];for(const s of pres.getElementsByTagNameNS('*','sldId')){const base=String(rm[s.getAttribute('r:id')]||'').split('/').pop();
-  const sx=F.get('ppt/slides/'+base)||'';if(/<p:sld\b[^>]*\bshow="(0|false)"/.test(sx.slice(0,1500)))continue;/* ausgeblendete Folien fehlen auch im PDF */
+  const sx=F.get('ppt/slides/'+base)||'';if(!all&&/<p:sld\b[^>]*\bshow="(0|false)"/.test(sx.slice(0,1500)))continue;/* ausgeblendete Folien fehlen auch im PDF */
   const sr=F.get('ppt/slides/_rels/'+base+'.rels');let txt='';
   if(sr){const nt=[...X(sr).getElementsByTagName('Relationship')].find(r=>/notesSlide$/.test(r.getAttribute('Type')||''));
    const nx=nt&&F.get('ppt/notesSlides/'+nt.getAttribute('Target').split('/').pop());
@@ -708,7 +732,7 @@ function mixStep(m,d){const live=m.live.filter(l=>l.on).map(l=>byId[l.src]).filt
  for(const x of m.live.filter(l=>l.on).map(l=>byId[l.src]).filter(Boolean)){const st=x.st;if(!st?.ps)continue;
   if(x.type==='slides'){const t=d>0?0:st.ps.n-1;if(st.idx!==t){st.prev=-1;st.idx=t;startVideo(t,st);x.dirty=true;}FS=st;updSlideUI();}
   if(x.type==='doc'){docGoto(d>0?0:st.ps.n-1,st);st.scroll=st.target;x.dirty=true;}}}
-const LAYER_SRC=()=>sources.filter(s=>s.type!=='mix');
+const LAYER_SRC=()=>sources.filter(s=>s.type!=='mix'&&s.type!=='pptlive');
 function renderScenes(m){const box=$('#scenes');box.innerHTML='';
  m.scenes.forEach((sc,i)=>{const d=document.createElement('div');d.className='scene'+(i===m.act?' onair':'')+(i===m.edit?' edit':'');d.dataset.i=i;
   const srcs=sc.layers.filter(l=>l.on).map(l=>byId[l.src]?.name||l.src).join(' + ')||'leer';
@@ -750,12 +774,29 @@ addSource({id:'stage',type:'stage',name:'Stage-Monitor',last:0,draw(now){
   if(lyNext){const nx=lyNext.replace(/\n/g,' / ');c.fillStyle='#8d95a8';c.font=F(fitFont(c,nx,W-8*u,Math.min(area*.25,hasSl?5.5*u:9*u),F));c.fillText(nx,W/2,bottom+area*.78);}}
 }});
 
+/* ---------- POWERPOINT LIVE (Desktop-App) ---------- */
+const PL={file:null,active:false,slide:0,total:0,black:false,notes:[],app:'',busy:false};
+addSource({id:'pptlive',type:'pptlive',name:'PowerPoint live',draw(){if(this.dirty){this.ctx.clearRect(0,0,W,H);this.dirty=false;}}});
+function plApply(r){if(!r)return;if(r.error&&!r.ended){toast('PowerPoint: '+r.error);}
+ if(r.ended){PL.active=false;}else if(r.ok&&r.slide){const ch=r.slide!==PL.slide;PL.active=true;PL.slide=r.slide;PL.total=r.total||PL.total;if(r.black!=null)PL.black=r.black;if(r.app)PL.app=r.app;if(ch)byId.presenter.dirty=true;}
+ updPlUI();}
+async function plCmd(cmd,extra={}){if(!NATIVE?.pptLive)return;if(cmd!=='state'&&!PL.active){toast('PowerPoint live ist nicht gestartet.');return;}
+ plApply(await NATIVE.pptLive({cmd,...extra}));}
+async function plStart(){if(!NATIVE?.pptLive||!PL.file){toast('Erst eine Präsentation wählen.');return;}if(PL.busy)return;PL.busy=true;$('#plStatus').textContent='Starte PowerPoint …';
+ const sc=screens&&screens[$('#plScr').value];const b=sc?{x:sc.bounds.x,y:sc.bounds.y,width:sc.bounds.width,height:sc.bounds.height}:null;
+ try{plApply(await NATIVE.pptLive({cmd:'open',name:PL.file.name,buf:PL.file.bytes,bounds:b}));}finally{PL.busy=false;updPlUI();}}
+function updPlUI(){$('#plRead').textContent=PL.active?`${PL.slide} / ${PL.total}`:'–';$('#plBlack').setAttribute('aria-pressed',PL.black);
+ $('#plStatus').textContent=PL.active?`Läuft in ${PL.app||'PowerPoint'} – Folie ${PL.slide} von ${PL.total}`+(PL.black?' · SCHWARZ':''):'Nicht gestartet.';
+ $('#plNotes').textContent=PL.active?(PL.notes[PL.slide-1]||'Keine Notizen zu dieser Folie'):'–';$('#navPpt').classList.toggle('isLive',PL.active);}
+setInterval(()=>{if(PL.active&&!PL.busy)plCmd('state');},1000);
+
 /* ---------- REFERENTENANSICHT ---------- */
 const PR={size:1,started:0};
 function wrapFit(c,text,maxW,maxH,F,size,min){let s=size,lines;for(;;){c.font=F(s);lines=wrapText(c,text,maxW);if(lines.length*s*1.3<=maxH||s<=min)break;s=Math.max(min,s*.9);}
  const max=Math.max(1,Math.floor(maxH/(s*1.3)));if(lines.length>max){lines=lines.slice(0,max);lines[max-1]+=' …';}return{s,lines};}
 addSource({id:'presenter',type:'presenter',name:'Referentenansicht',last:0,draw(now){
  if(now-this.last<100&&!this.dirty)return;this.last=now;this.dirty=false;
+ if(PL.active&&clickTarget()==='pptlive'){drawPresenterPL(this.ctx);return;}
  const S=FS,c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif',B=s=>`700 ${s}px ${A}`;c.fillStyle='#0b0c10';c.fillRect(0,0,W,H);c.textBaseline='middle';
  const d=new Date();c.font=B(6*u);c.fillStyle='#c9cfdb';c.textAlign='left';c.fillText(p2(d.getHours())+':'+p2(d.getMinutes()),3*u,6.5*u);
  if(PR.started){const el=Math.floor((Date.now()-PR.started)/1000);c.font=`400 ${3.6*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('Laufzeit '+fmt(el),24*u,6.5*u);}
@@ -773,9 +814,19 @@ addSource({id:'presenter',type:'presenter',name:'Referentenansicht',last:0,draw(
  if(BO){c.textBaseline='middle';c.textAlign='center';c.fillStyle='#ff3b47';c.font=B(4*u);c.fillText('● BLACKOUT AKTIV',cx+cw/2,H-4*u);}
 }});
 
+function drawPresenterPL(c){const u=H/100,A='Arial, Helvetica, sans-serif',B=s=>`700 ${s}px ${A}`;c.fillStyle='#0b0c10';c.fillRect(0,0,W,H);c.textBaseline='middle';
+ const d=new Date();c.font=B(6*u);c.fillStyle='#c9cfdb';c.textAlign='left';c.fillText(p2(d.getHours())+':'+p2(d.getMinutes()),3*u,6.5*u);
+ if(PR.started){c.font=`400 ${3.6*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('Laufzeit '+fmt(Math.floor((Date.now()-PR.started)/1000)),24*u,6.5*u);}
+ c.textAlign='center';c.font=`600 ${4*u}px ${A}`;c.fillStyle='#c9cfdb';c.fillText(`PowerPoint live · Folie ${PL.slide} / ${PL.total}`,W/2,6.5*u);
+ if(T.mode!=='clock'){const ts=tState();c.textAlign='right';c.fillStyle=ts.col;c.font=B(fitFont(c,ts.txt,W*.25,9*u,B));c.fillText(ts.txt,W-3*u,6.5*u);}
+ c.textAlign='left';c.font=`600 ${3*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('NOTIZEN',3*u,14*u);c.textBaseline='top';
+ const note=PL.notes[PL.slide-1]||'';if(note){const F=s=>`400 ${s}px ${A}`;const r=wrapFit(c,note,W-6*u,H-24*u,F,6*u*PR.size,2.6*u);c.fillStyle='#f2f4f8';r.lines.forEach((l,i)=>c.fillText(l,3*u,17*u+i*r.s*1.3));}
+ else{c.fillStyle='#555';c.font=`400 ${4*u}px ${A}`;c.fillText('Keine Notizen zu dieser Folie',3*u,17*u);}
+ if(PL.black||BO){c.textBaseline='middle';c.textAlign='center';c.fillStyle='#ff3b47';c.font=B(4*u);c.fillText('● SCHWARZ',W/2,H-4*u);}}
+
 /* ---------- BLACKOUT ---------- */
 let BO=false,boA=0,boLast=0;
-function setBO(v){BO=v;document.body.classList.toggle('bo',BO);$('#bo').setAttribute('aria-pressed',BO);$('#bo').textContent=BO?'BLACKOUT AKTIV':'BLACKOUT';}
+function setBO(v){BO=v;if(PL.active&&NATIVE?.pptLive)NATIVE.pptLive({cmd:'black',on:v}).then(plApply);document.body.classList.toggle('bo',BO);$('#bo').setAttribute('aria-pressed',BO);$('#bo').textContent=BO?'BLACKOUT AKTIV':'BLACKOUT';}
 function boStep(now){const st=boLast?(now-boLast)/200:0;boLast=now;if(BO)boA=Math.min(1,boA+st);else boA=Math.max(0,boA-st);}
 
 /* ---------- AUSGÄNGE ---------- */
@@ -790,7 +841,7 @@ requestAnimationFrame(loop);
 addEventListener('dblclick',fs);
 addEventListener('keydown',function(e){if(e.key==='f'||e.key==='F'){fs();return;}try{window.opener.PV.key(e);}catch(_){}});
 })();<\/script></body></html>`;
-function srcOptions(sel){return sources.map(s=>`<option value="${s.id}"${s.id===sel?' selected':''}>${s.name}</option>`).join('');}
+function srcOptions(sel){return sources.filter(s=>s.type!=='pptlive').map(s=>`<option value="${s.id}"${s.id===sel?' selected':''}>${s.name}</option>`).join('');}
 function openOutput(src,scrIdx,bg,opt={}){
  const id=++outSeq,o={id,src,win:null,bg:bg??'#000000',test:false,ndi:!!opt.ndi,ndiName:opt.name||('CueStack '+id)};
  if(opt.win!==false){let feat='popup,width=960,height=540,left=80,top=80',name='cuestack_out_'+Date.now()+'_'+id;const sc=screens&&screens[scrIdx];
@@ -834,8 +885,9 @@ function renderOuts(){const box=$('#outs');box.innerHTML='';$('#noOuts').style.d
  updLive();}
 function updLive(){const live=new Set();const add=id=>{if(live.has(id))return;live.add(id);const s=byId[id];if(s?.type==='mix')s.live.forEach(l=>l.on&&add(l.src));};
  /* Stage zeigt Folien nur als Vorschau – zählt nicht als LIVE */
- outputs.forEach(o=>add(o.src));$$('#nav button').forEach(b=>b.classList.toggle('isLive',live.has(b.dataset.v)));}
-function fillScreens(){const sel=$('#scrSel');sel.innerHTML='<option value="">Neues Fenster</option>'+(screens||[]).map((s,i)=>`<option value="${i}">${(s.label||('Bildschirm '+(i+1))).replace(/[<>&"]/g,'')}${s.isPrimary?' (Haupt)':''} · ${s.width}×${s.height}</option>`).join('');
+ outputs.forEach(o=>add(o.src));if(PL.active)live.add('pptlive');$$('#nav button').forEach(b=>b.classList.toggle('isLive',live.has(b.dataset.v)));}
+function fillScreens(){const ps=$('#plScr');if(ps)ps.innerHTML='<option value="">PowerPoint-Einstellung verwenden</option>'+(screens||[]).map((s,i)=>`<option value="${i}">${(s.label||('Bildschirm '+(i+1))).replace(/[<>&"]/g,'')}${s.isPrimary?' (Haupt)':''}</option>`).join('');
+ const sel=$('#scrSel');sel.innerHTML='<option value="">Neues Fenster</option>'+(screens||[]).map((s,i)=>`<option value="${i}">${(s.label||('Bildschirm '+(i+1))).replace(/[<>&"]/g,'')}${s.isPrimary?' (Haupt)':''} · ${s.width}×${s.height}</option>`).join('');
  if(screens&&screens.length>1){const ext=screens.findIndex(s=>!s.isPrimary);if(ext>=0)sel.value=ext;}}
 async function detectScreens(){if(!('getScreenDetails' in window)){toast('Bildschirmerkennung braucht Chrome oder Edge. Alternativ: Ausgangsfenster auf den Projektor ziehen und doppelklicken.');return;}
  try{const d=await window.getScreenDetails();screens=d.screens;d.addEventListener('screenschange',()=>{screens=d.screens;fillScreens();});fillScreens();toast(screens.length+' Bildschirm(e) erkannt.');}
@@ -866,10 +918,11 @@ PV.key=function(e){const k=e.key;
  const nx=['ArrowRight','ArrowDown','PageDown',' '].includes(k),pv=['ArrowLeft','ArrowUp','PageUp'].includes(k);if(!nx&&!pv)return;
  e.preventDefault();clickStep(nx?1:-1);};
 /* Was schaltet der Clicker? „auto“: der Mix auf einem Ausgang, sonst die Quelle auf dem Ausgang, sonst die gerade geöffnete Ansicht */
-function clickTarget(){if(clicker!=='auto')return byId[clicker]||clicker;
+function clickTarget(){if(clicker==='pptlive')return 'pptlive';if(clicker!=='auto')return byId[clicker]||clicker;
+ if(PL.active)return 'pptlive';
  const cand=[...outputs.map(o=>byId[o.src]),byId[curView]].filter(Boolean);
  return cand.find(x=>x.type==='mix')||cand.find(x=>['slides','doc','lyrics'].includes(x.type))||(cand.find(x=>x.type==='presenter'||x.type==='stage')&&byId[FS.id])||byId[FS.id];}
-function clickStep(d){const t=clickTarget();
+function clickStep(d){const t=clickTarget();if(t==='pptlive'){plCmd(d>0?'next':'prev');return;}
  if(t==='slides')slideGo(FS.idx+d,FS);else if(t==='doc')docGoto(docPage(FD)+d,FD);else if(t==='lyrics')lyStep(d);
  else if(t?.type==='mix')mixStep(t,d);else if(t?.type==='slides')slideGo(t.st.idx+d,t.st);else if(t?.type==='doc')docGoto(docPage(t.st)+d,t.st);else if(t?.type==='lyrics')lyStep(d);
  else slideGo(FS.idx+d,FS);}
@@ -934,7 +987,7 @@ function setRes(k){resKey=k;[W,H]=RES[k];for(const s of sources){s.canvas.width=
 function show(v){curView=v;$$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));const s=byId[v];
  const pid=s.type==='cap'?'cap':s.type==='mix'?'mix':s.type==='med'?'med':s.type==='slides'?'slides':s.type==='doc'?'doc':v;
  if(s.type==='slides'){S=s.st;updSlidePanel();}if(s.type==='doc'){D=s.st;updDocUI();}$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+pid));
- const pv=$('#pv-'+pid);pv.querySelectorAll('canvas').forEach(c=>c.remove());pv.prepend(s.canvas);s.dirty=true;
+ const pv=$('#pv-'+pid);if(pv){pv.querySelectorAll('canvas').forEach(c=>c.remove());pv.prepend(s.canvas);}s.dirty=true;if(v==='pptlive')updPlUI();
  if(s.type==='cap'){$('#capTitle').textContent=s.name;updCapUI();}if(s.type==='mix'){$('#mixTitle').textContent=s.name;renderMix();}if(s.type==='med')updMedUI();
  }
 function updCapUI(){const s=byId[curView];if(!s||s.type!=='cap')return;$('#capLabel').textContent=s.label||'Keine Quelle';$('#capEmpty').style.display=s.video?'none':'';$('#capFit').value=s.fit;$('#capStop').disabled=!s.video;}
@@ -1028,8 +1081,14 @@ $('#lySearch').onsubmit=async e=>{e.preventDefault();const q=$('#lyQ').value.tri
    b.textContent=`${s.trackName} – ${s.artistName}${s.syncedLyrics?' · synchron':s.plainLyrics?'':' · ohne Text'}`;li.appendChild(b);ul.appendChild(li);});
  }catch(err){ul.innerHTML='';toast('Suche nicht möglich (Internet?): '+err.message);}};
 $('#lyRes').onclick=e=>{const b=e.target.closest('button');if(!b)return;const s=lyResults[+b.dataset.i];const txt=s.syncedLyrics||s.plainLyrics;if(!txt){toast('Für diesen Eintrag gibt es keinen Text.');return;}setLyrics(`${s.trackName} – ${s.artistName}`,txt);};
+/* PowerPoint live */
+$('#plOpen').onclick=()=>$('#plFile').click();
+$('#plFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const bytes=await f.arrayBuffer();PL.file={name:f.name,bytes};
+ $('#plName').textContent=f.name;PL.notes=[];if(/\.(pptx|ppsx)$/i.test(f.name)){try{PL.notes=await pptxNotes(bytes,true);}catch(err){}}updPlUI();};
+$('#plStart').onclick=plStart;$('#plPrev').onclick=()=>plCmd('prev');$('#plNext').onclick=()=>plCmd('next');
+$('#plBlack').onclick=()=>plCmd('black',{on:!PL.black});$('#plEnd').onclick=()=>plCmd('end');
 /* Referent */
-$('#prPrev').onclick=()=>slideGo(FS.idx-1,FS);$('#prNext').onclick=()=>slideGo(FS.idx+1,FS);
+$('#prPrev').onclick=()=>PL.active?plCmd('prev'):slideGo(FS.idx-1,FS);$('#prNext').onclick=()=>PL.active?plCmd('next'):slideGo(FS.idx+1,FS);
 $('#prRun').onclick=()=>{PR.started=PR.started?0:Date.now();$('#prRun').textContent=PR.started?'Laufzeit stoppen':'Laufzeit starten';byId.presenter.dirty=true;saveSoon();};
 $('#prSize').oninput=e=>{PR.size=+e.target.value;byId.presenter.dirty=true;saveSoon();};
 $('#prNotes').addEventListener('input',e=>{const S=FS;if(!S.ps)return;S.notes[S.idx]=e.target.value;byId.presenter.dirty=true;saveSoon();});
@@ -1104,7 +1163,9 @@ PV.remote=function(cmd,p={}){cmd=String(cmd||'').replace(/^\/+|\/+$/g,'').toLowe
   case'mix/scene':{const m=mixOf();if(m)sceneGo(m,n(p.s)-1);break;}
   case'mix/next':{const m=mixOf();if(m)sceneGo(m,m.act+1);break;}case'mix/prev':{const m=mixOf();if(m)sceneGo(m,m.act-1);break;}
   case'mix/step':{const m=mixOf();if(m)mixStep(m,n(p.d)||1);break;}
-  case'clicker':if(['auto','slides','doc','lyrics','mix1','mix2','mix3','mix4'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
+  case'ppt/next':plCmd('next');break;case'ppt/prev':plCmd('prev');break;case'ppt/goto':plCmd('goto',{n:n(p.n)});break;
+  case'ppt/black':plCmd('black',{on:p.on!=null?p.on!=='0':!PL.black});break;case'ppt/end':plCmd('end');break;case'ppt/start':plStart();break;
+  case'clicker':if(['auto','pptlive','slides','doc','lyrics','mix1','mix2','mix3','mix4'].includes(p.target)){clicker=p.target;$('#clicker').value=clicker;}break;
   case'state':break;
   default:return{ok:false,error:'Unbekannter Befehl: '+cmd};}
  saveSoon();return{ok:true,state:PV.state()};};
@@ -1112,6 +1173,7 @@ PV.state=function(){const ts=tState();return{blackout:BO,clicker,
  timer:{text:ts.txt,running:T.running,mode:T.mode,remaining:T.mode==='down'?Math.ceil(T.dur-tEl()):null,overtime:!!ts.up},
  slides:{deck:FS.n,n:FS.ps?FS.idx+1:0,total:FS.ps?FS.ps.n:0,video:!!curVideo(FS),note:FS.ps?(FS.notes[FS.idx]||''):''},doc:{deck:FD.n,page:FD.ps?docPage(FD)+1:0,total:FD.ps?FD.ps.n:0},
  decks:SL.map(x=>({deck:x.n,n:x.ps?x.idx+1:0,total:x.ps?x.ps.n:0,name:x.files[0]?.name||''})),
+ pptlive:{active:PL.active,slide:PL.slide,total:PL.total,black:PL.black,note:PL.active?(PL.notes[PL.slide-1]||''):''},
  mix:MIX.map(m=>({scene:m.act+1,name:m.scenes[m.act]?.name||'',total:m.scenes.length})),
  lyrics:{title:LY.title,line:LY.idx>=0?(LY.lines[LY.idx]?.text||''):'',playing:LY.playing},stage:{message:ST.msg},
  outputs:outputs.map(o=>({id:o.id,source:o.src,ndi:o.ndi,window:!!o.win}))};};
@@ -1124,6 +1186,7 @@ function pickerModal(list){return new Promise(res=>{const m=document.createEleme
  m.onclick=e=>{const b=e.target.closest('button');if(!b&&e.target!==m)return;m.remove();res(b&&b.dataset.i!=null?list[+b.dataset.i].id:null);};document.body.appendChild(m);});}
 
 async function initNative(){const nb=$('#nativeBox');
+ $('#plWeb').style.display=NATIVE?.pptLive?'none':'';$('#plNative').style.display=NATIVE?.pptLive?'':'none';$('#plDl').href=RELEASES;
  if(!NATIVE){nb.innerHTML=`<p class="hint">Du nutzt die Browser-Version. Die <a href="${RELEASES}" target="_blank" rel="noopener" style="color:var(--ac)">Desktop-App für Windows/Mac</a> kann zusätzlich: NDI-Ausgabe mit Transparenz, PowerPoint/Word/Excel direkt öffnen, Steuerung über Bitfocus Companion, Ausgänge automatisch im Vollbild.</p>`;return;}
  document.title='CueStack Desktop';
  NATIVE.onRemote((cmd,p)=>PV.remote(cmd,p));setInterval(()=>NATIVE.pushState(PV.state()),400);

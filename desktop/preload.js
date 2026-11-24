@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('CueNative', {
     let id = null; try { id = await cb(list); } catch (err) {}
     reply(rid, id);
   }),
+  pptLive: (c) => ipcRenderer.invoke('ppt-live', c.buf ? { ...c, buf: new Uint8Array(c.buf) } : c),
   convertOffice: (name, buf) => ipcRenderer.invoke('convert-office', { name, buf: new Uint8Array(buf) }),
 });

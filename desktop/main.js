@@ -6,7 +6,7 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 let grandiose = null, ndiError = null;
 try { grandiose = require('@stagetimerio/grandiose'); } catch (e) { ndiError = e.message; }
@@ -150,19 +150,91 @@ if ($ext -match 'ppt|pps|odp') {
   $w.ExportAsFixedFormat(0, $out); $w.Close($false); $app.Quit()
 } else { throw "Dateityp nicht unterstützt" }
 `;
-const AS_SCRIPT = `
-on run argv
+// AppleScripts: der App-Name muss fest im Skript stehen, sonst kennt osascript die Befehle der App nicht
+const AS = {
+  'Microsoft PowerPoint': `on run argv
+  set inPath to item 1 of argv
+  set outPath to item 2 of argv
+  tell application "Microsoft PowerPoint"
+    open (POSIX file inPath)
+    delay 1
+    set p to active presentation
+    try
+      save p in outPath as save as PDF
+    on error
+      save p in ((POSIX file outPath) as text) as save as PDF
+    end try
+    close p saving no
+  end tell
+end run`,
+  'Microsoft Word': `on run argv
+  set inPath to item 1 of argv
+  set outPath to item 2 of argv
+  tell application "Microsoft Word"
+    open (POSIX file inPath)
+    delay 1
+    set d to active document
+    save as d file name outPath file format format PDF
+    close d saving no
+  end tell
+end run`,
+  Keynote: `on run argv
   set inF to POSIX file (item 1 of argv)
   set outF to POSIX file (item 2 of argv)
-  set appName to item 3 of argv
-  tell application appName
+  tell application "Keynote"
     set d to open inF
     delay 1
     export d to outF as PDF
     close d saving no
   end tell
-end run
-`;
+end run`,
+  Pages: `on run argv
+  set inF to POSIX file (item 1 of argv)
+  set outF to POSIX file (item 2 of argv)
+  tell application "Pages"
+    set d to open inF
+    delay 1
+    export d to outF as PDF
+    close d saving no
+  end tell
+end run`,
+  Numbers: `on run argv
+  set inF to POSIX file (item 1 of argv)
+  set outF to POSIX file (item 2 of argv)
+  tell application "Numbers"
+    set d to open inF
+    delay 1
+    export d to outF as PDF
+    close d saving no
+  end tell
+end run`,
+};
+const MS_CONTAINER = { 'Microsoft PowerPoint': 'com.microsoft.Powerpoint', 'Microsoft Word': 'com.microsoft.Word' };
+// Microsoft-Apps auf dem Mac sind „sandboxed“: Dateien in ihrem eigenen Container dürfen sie ohne Rückfrage lesen/schreiben
+function macWorkDir(appName) {
+  const c = MS_CONTAINER[appName];
+  const cands = [];
+  if (c) cands.push(path.join(os.homedir(), 'Library', 'Containers', c, 'Data', 'Documents', 'CueStack'));
+  cands.push(path.join(os.homedir(), 'Documents', 'CueStack-Umwandlung'));
+  for (const d of cands) { try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); return d; } catch (e) {} }
+  return null;
+}
+async function macConvert(appName, srcFile, outF) {
+  const wd = macWorkDir(appName) || path.dirname(srcFile);
+  const stamp = Date.now() + '_';
+  const inC = path.join(wd, stamp + path.basename(srcFile));
+  const outC = path.join(wd, stamp + path.basename(outF));
+  fs.copyFileSync(srcFile, inC);
+  const as = path.join(os.tmpdir(), 'cuestack-' + appName.replace(/\W/g, '') + '.applescript');
+  fs.writeFileSync(as, AS[appName]);
+  try {
+    await run('osascript', [as, inC, outC]);
+    for (let i = 0; i < 20 && !fs.existsSync(outC); i++) await new Promise(r => setTimeout(r, 250));
+    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt');
+    fs.copyFileSync(outC, outF);
+  } finally { for (const f of [inC, outC]) fs.rm(f, { force: true }, () => {}); }
+}
+const macHas = (appName) => fs.existsSync(`/Applications/${appName}.app`);
 function run(cmd, args, timeout = 180000) {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { timeout, windowsHide: true }, (err, stdout, stderr) => err ? reject(new Error((stderr || err.message).toString().trim().slice(0, 300))) : resolve(stdout));
@@ -189,12 +261,13 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
       await run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps, inF, outF]);
     });
   } else if (process.platform === 'darwin') {
-    const appName = /\.(pptx?|ppsx?|key|odp)$/.test(ext) ? 'Keynote' : /\.(xlsx?|ods)$/.test(ext) ? 'Numbers' : 'Pages';
-    if (fs.existsSync(`/Applications/${appName}.app`)) {
-      via = await tryIt(appName, async () => {
-        const as = path.join(dir, 'convert.applescript'); fs.writeFileSync(as, AS_SCRIPT);
-        await run('osascript', [as, inF, outF, appName]);
-      });
+    const order = /\.(pptx?|ppsx?|odp)$/.test(ext) ? ['Microsoft PowerPoint', 'Keynote']
+      : ext === '.key' ? ['Keynote']
+      : /\.(xlsx?|ods)$/.test(ext) ? ['Numbers']
+      : ['Microsoft Word', 'Pages'];
+    for (const appName of order) {
+      if (via) break;
+      if (macHas(appName)) via = await tryIt(appName, () => macConvert(appName, inF, outF));
     }
   }
   if (!via) {
@@ -202,9 +275,179 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
     if (so) via = await tryIt('LibreOffice', () => run(so, ['--headless', '--convert-to', 'pdf', '--outdir', dir, inF]));
   }
   try {
-    if (!via) return { error: errors.length ? errors.join(' | ') : 'Kein Programm zum Umwandeln gefunden. Bitte Microsoft PowerPoint, Keynote oder LibreOffice installieren (LibreOffice ist kostenlos).' };
+    if (!via) return { error: errors.length ? errors.join(' | ') : 'Kein Programm zum Umwandeln gefunden. Bitte Microsoft PowerPoint, Keynote oder LibreOffice installieren (LibreOffice ist kostenlos). Auf dem Mac beim ersten Mal die Rückfragen „CueStack möchte … steuern“ bzw. „auf Daten anderer Apps zugreifen“ erlauben.' };
     return { pdf: fs.readFileSync(outF), via };
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
+});
+
+
+/* ---------- PowerPoint live: echte Bildschirmpräsentation mit allen Effekten, ferngesteuert ---------- */
+const PS_LIVE = `
+$ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = [Text.Encoding]::UTF8
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$app = $null; $pres = $null; $win = $null
+function Send($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress)); [Console]::Out.Flush() }
+function State() {
+  try { $v = $win.View; return @{ ok = $true; slide = $v.Slide.SlideIndex; total = $pres.Slides.Count; black = ($v.State -eq 3); app = 'PowerPoint' } }
+  catch { return @{ ok = $true; ended = $true } }
+}
+while ($true) {
+  $line = [Console]::In.ReadLine()
+  if ($line -eq $null) { break }
+  try {
+    $c = $line | ConvertFrom-Json
+    switch ($c.cmd) {
+      'open' {
+        $app = New-Object -ComObject PowerPoint.Application
+        $pres = $app.Presentations.Open($c.path, -1, 0, 0)
+        $s = $pres.SlideShowSettings
+        $s.ShowType = 1
+        try { $s.ShowPresenterView = 0 } catch {}
+        $win = $s.Run()
+        if ($c.bounds) {
+          $win.Left = $c.bounds.x * 0.75; $win.Top = $c.bounds.y * 0.75
+          $win.Width = $c.bounds.width * 0.75; $win.Height = $c.bounds.height * 0.75
+        }
+        Send (State)
+      }
+      'next'  { $win.View.Next(); Send (State) }
+      'prev'  { $win.View.Previous(); Send (State) }
+      'goto'  { $win.View.GotoSlide([int]$c.n); Send (State) }
+      'black' { if ($c.on) { $win.View.State = 3 } else { $win.View.State = 1 }; Send (State) }
+      'state' { Send (State) }
+      'end'   { try { $win.View.Exit() } catch {}; try { $pres.Close() } catch {}; Send @{ ok = $true; ended = $true } }
+      default { Send @{ ok = $false; error = 'unbekannter Befehl' } }
+    }
+  } catch { Send @{ ok = $false; error = $_.Exception.Message } }
+}
+`;
+function winBridge() {
+  const ps = path.join(os.tmpdir(), 'cuestack-live.ps1');
+  fs.writeFileSync(ps, '﻿' + PS_LIVE, 'utf8');
+  const proc = spawn('powershell.exe', ['-NoProfile', '-Sta', '-ExecutionPolicy', 'Bypass', '-File', ps], { windowsHide: true });
+  let buf = ''; const waiters = [];
+  proc.stdout.on('data', (d) => {
+    buf += d.toString('utf8'); let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line || line[0] !== '{') continue;
+      const w = waiters.shift(); if (!w) continue;
+      try { w(JSON.parse(line)); } catch (e) { w({ ok: false, error: line.slice(0, 200) }); }
+    }
+  });
+  proc.on('exit', () => { while (waiters.length) waiters.shift()({ ok: false, ended: true, error: 'PowerPoint-Verbindung beendet' }); });
+  let chain = Promise.resolve();
+  const send = (obj, timeout = 20000) => (chain = chain.then(() => new Promise((res) => {
+    const w = (v) => { clearTimeout(t); res(v); };
+    const t = setTimeout(() => { const k = waiters.indexOf(w); if (k >= 0) waiters.splice(k, 1); res({ ok: false, error: 'PowerPoint antwortet nicht' }); }, timeout);
+    waiters.push(w); proc.stdin.write(JSON.stringify(obj) + '\n');
+  })));
+  return { kind: 'win', proc, send, close: () => { try { proc.stdin.end(); } catch (e) {} setTimeout(() => { try { proc.kill(); } catch (e) {} }, 3000); } };
+}
+const MAC_LIVE = {
+  'Microsoft PowerPoint': {
+    open: `on run argv
+  tell application "Microsoft PowerPoint"
+    activate
+    open (POSIX file (item 1 of argv))
+    delay 1
+    set sss to slide show settings of active presentation
+    set show type of sss to slide show type speaker
+    run slide show sss
+  end tell
+end run`,
+    next: 'tell application "Microsoft PowerPoint" to go to next slide slide show view of slide show window 1',
+    prev: 'tell application "Microsoft PowerPoint" to go to previous slide slide show view of slide show window 1',
+    goto: `on run argv
+  tell application "Microsoft PowerPoint" to go to slide (slide show view of slide show window 1) number ((item 1 of argv) as integer)
+end run`,
+    black: `on run argv
+  tell application "Microsoft PowerPoint"
+    if (item 1 of argv) is "1" then
+      set slide state of slide show view of slide show window 1 to slide show state black screen
+    else
+      set slide state of slide show view of slide show window 1 to slide show state running
+    end if
+  end tell
+end run`,
+    state: `tell application "Microsoft PowerPoint"
+  set v to slide show view of slide show window 1
+  return ((slide index of slide of v) as text) & "/" & ((count of slides of active presentation) as text)
+end tell`,
+    end: 'tell application "Microsoft PowerPoint" to exit slide show slide show view of slide show window 1',
+  },
+  Keynote: {
+    open: `on run argv
+  tell application "Keynote"
+    activate
+    set d to open (POSIX file (item 1 of argv))
+    delay 1
+    start d from slide 1 of d
+  end tell
+end run`,
+    next: 'tell application "Keynote" to show next',
+    prev: 'tell application "Keynote" to show previous',
+    goto: `on run argv
+  tell application "Keynote" to start front document from slide ((item 1 of argv) as integer) of front document
+end run`,
+    black: 'return ""',
+    state: `tell application "Keynote"
+  if not playing then error "beendet"
+  return ((slide number of current slide of front document) as text) & "/" & ((count of slides of front document) as text)
+end tell`,
+    end: 'tell application "Keynote" to stop front document',
+  },
+};
+function macBridge(appName) {
+  const scripts = MAC_LIVE[appName];
+  const runAs = async (op, args = []) => {
+    const f = path.join(os.tmpdir(), `cuestack-live-${appName.replace(/\W/g, '')}-${op}.applescript`);
+    fs.writeFileSync(f, scripts[op]); return run('osascript', [f, ...args], op === 'open' ? 120000 : 15000);
+  };
+  const state = async () => {
+    try { const [a, b] = String(await runAs('state')).trim().split('/').map(Number); return { ok: true, slide: a, total: b, app: appName.replace('Microsoft ', '') }; }
+    catch (e) { return { ok: true, ended: true }; }
+  };
+  let chain = Promise.resolve();
+  const send = (c) => (chain = chain.then(async () => {
+    try {
+      if (c.cmd === 'open') { await runAs('open', [c.path]); await new Promise(r => setTimeout(r, 1500)); }
+      else if (c.cmd === 'goto') await runAs('goto', [String(c.n)]);
+      else if (c.cmd === 'black') await runAs('black', [c.on ? '1' : '0']);
+      else if (c.cmd === 'end') { await runAs('end'); return { ok: true, ended: true }; }
+      else if (c.cmd !== 'state') await runAs(c.cmd);
+      const st = await state(); if (c.cmd === 'black') st.black = !!c.on; return st;
+    } catch (e) { return { ok: false, error: e.message }; }
+  }));
+  return { kind: 'mac', send, close: () => {} };
+}
+let live = null;
+ipcMain.handle('ppt-live', async (_e, c) => {
+  try {
+    if (c.cmd === 'open') {
+      if (live) { try { await live.send({ cmd: 'end' }); } catch (e) {} live.close(); live = null; }
+      const safe = String(c.name || 'praesentation.pptx').replace(/[^\w.\- ]+/g, '_');
+      let appName = null;
+      if (process.platform === 'darwin') {
+        const isKey = /\.key$/i.test(safe);
+        appName = !isKey && macHas('Microsoft PowerPoint') ? 'Microsoft PowerPoint' : macHas('Keynote') ? 'Keynote' : null;
+        if (!appName) return { ok: false, error: 'Weder Microsoft PowerPoint noch Keynote gefunden.' };
+      } else if (process.platform !== 'win32') return { ok: false, error: 'PowerPoint live gibt es nur unter Windows und macOS.' };
+      const dir = process.platform === 'darwin' ? (macWorkDir(appName) || os.tmpdir()) : path.join(os.tmpdir(), 'cuestack-live');
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, 'live_' + Date.now() + '_' + safe);
+      fs.writeFileSync(file, Buffer.from(c.buf.buffer, c.buf.byteOffset, c.buf.byteLength));
+      live = process.platform === 'win32' ? winBridge() : macBridge(appName);
+      const r = await live.send({ cmd: 'open', path: file, bounds: c.bounds || null }, 120000);
+      setTimeout(() => { if (win && !win.isDestroyed()) win.focus(); }, 1200);
+      return r;
+    }
+    if (!live) return { ok: true, ended: true };
+    const r = await live.send(c);
+    if (c.cmd === 'end' || r.ended) { const l = live; live = null; l.close(); }
+    return r;
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 /* ---------- HTTP-API für Companion & Handy-Fernbedienung ---------- */
@@ -262,6 +505,7 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 app.on('window-all-closed', async () => {
+  if (live) { try { await live.send({ cmd: 'end' }); } catch (e) {} live.close(); live = null; }
   for (const s of senders.values()) { try { await (await s.p).destroy(); } catch (e) {} }
   app.quit();
 });

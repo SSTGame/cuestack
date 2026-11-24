@@ -1,4 +1,5 @@
 name: Web-Version veröffentlichen (GitHub Pages)
+# Quelle: Settings → Pages → „GitHub Actions“
 
 on:
   push:

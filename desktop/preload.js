@@ -20,5 +20,6 @@ contextBridge.exposeInMainWorld('CueNative', {
   }),
   pptLive: (c) => ipcRenderer.invoke('ppt-live', c.buf ? { ...c, buf: new Uint8Array(c.buf) } : c),
   fxPrepare: (name, buf, height) => ipcRenderer.invoke('fx-prepare', { name, buf: new Uint8Array(buf), height }),
+  showLog: () => ipcRenderer.invoke('show-log'),
   convertOffice: (name, buf) => ipcRenderer.invoke('convert-office', { name, buf: new Uint8Array(buf) }),
 });

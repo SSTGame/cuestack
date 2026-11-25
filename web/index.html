@@ -93,6 +93,10 @@ details p,details li{color:var(--mu);font-size:12.5px}
 kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5px;font-size:12px}
 #toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,30px);opacity:0;background:#222733;border:1px solid var(--ln);padding:10px 16px;border-radius:10px;transition:.25s;z-index:9;max-width:90vw}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+#errs{position:fixed;right:16px;bottom:16px;z-index:10;display:grid;gap:8px;width:min(440px,92vw)}
+.err{background:#2a0d10;border:1px solid #7a2028;border-radius:12px;padding:12px 14px}
+.err b{color:#ff8f96}.err .m{margin:6px 0 10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;max-height:180px;overflow:auto}
+.err .r{display:flex;gap:6px;justify-content:flex-end}
 #busy{position:fixed;left:16px;bottom:16px;z-index:9;display:none;gap:12px;align-items:center;background:#12392a;border:1px solid var(--ac2);padding:12px 16px;border-radius:12px;max-width:min(460px,90vw)}
 #busy.on{display:flex}#busy small{color:var(--mu)}
 .spin{width:22px;height:22px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--ac);animation:sp 1s linear infinite;flex:none}
@@ -383,6 +387,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
 </div>
 </div>
 <div id="toast" role="status"></div>
+<div id="errs" role="alert"></div>
 <div id="busy" role="status"><span class="spin"></span><div><b id="busyT"></b><br><small id="busyS"></small></div></div>
 <div id="vids"></div>
 
@@ -399,6 +404,11 @@ const PV=window.PV={};
 const sources=[],byId={};
 const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 function addSource(o){o.canvas=mk(W,H);o.ctx=o.canvas.getContext('2d');o.dirty=true;sources.push(o);byId[o.id]=o;return o;}
+/* Fehler bleiben stehen, bis man sie schließt */
+function toastErr(m){const box=$('#errs');const d=document.createElement('div');d.className='err';
+ d.innerHTML='<b>Fehler</b><div class="m"></div><div class="r"><button data-a="copy">Kopieren</button>'+(NATIVE?.showLog?'<button data-a="log">Protokoll</button>':'')+'<button data-a="x">Schließen</button></div>';
+ $('.m',d).textContent=m;d.onclick=e=>{const a=e.target.dataset.a;if(a==='x')d.remove();else if(a==='copy')navigator.clipboard?.writeText(m).then(()=>toast('Kopiert.'),()=>{});else if(a==='log')NATIVE.showLog();};
+ box.appendChild(d);while(box.children.length>3)box.firstChild.remove();}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),4000);}
 const ease=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
 function fitRect(iw,ih,w,h,mode){if(mode==='stretch')return[0,0,w,h];const s=mode==='cover'?Math.max(w/iw,h/ih):Math.min(w/iw,h/ih);return[(w-iw*s)/2,(h-ih*s)/2,iw*s,ih*s];}
@@ -505,7 +515,7 @@ async function readFiles(list,allowVid,opts={}){const arr=[...list].sort((a,b)=>
    try{const ab=await f.arrayBuffer();let notes=null;if(/\.(pptx|ppsx)$/i.test(f.name)){try{notes=await pptxNotes(ab);}catch(e){}}
     const r=await NATIVE.convertOffice(f.name,ab);if(r.error)throw new Error(r.error);
     out.push({name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',bytes:r.pdf,notes});toast('„'+f.name+'“ umgewandelt ('+r.via+')'+(notes&&notes.some(Boolean)?' – inkl. Sprechernotizen.':'.'));}
-   catch(e){toast('Umwandlung fehlgeschlagen: '+e.message);}continue;}
+   catch(e){toastErr('Umwandlung von „'+f.name+'“ fehlgeschlagen:\n'+e.message);}continue;}
   if(isHeicF(f)){try{out.push(await normFile({name:f.name,type:f.type,bytes:await f.arrayBuffer()}));}catch(e){toast('HEIC-Umwandlung fehlgeschlagen: '+e.message);}continue;}
   if(!isPdf(f)&&!isImg(f)&&!(allowVid&&isVid(f))){toast(officeHint(f.name));continue;}out.push({name:f.name,type:f.type,bytes:await f.arrayBuffer()});}return out;}
 const isOffice=f=>/\.(pptx?|ppsx?|key|docx?|odt|odp|rtf|xlsx?|ods)$/i.test(f.name);
@@ -610,7 +620,7 @@ async function fxFromPptx(f){
  const ab=await f.arrayBuffer();let notes=[];try{notes=await pptxNotes(ab,true);}catch(e){}
  busy('PowerPoint bereitet die Effekte vor …','dauert etwa so lange wie die Präsentation');
  try{const r=await NATIVE.fxPrepare(f.name,ab,resKey==='2160'?2160:1080);
-  if(r.error){toast('Effekte vorbereiten fehlgeschlagen: '+r.error+' – lade als Standbild-Folien.');return null;}
+  if(r.error){toastErr('Effekte vorbereiten fehlgeschlagen – lade als Standbild-Folien.\n'+r.error);return null;}
   busy('Suche Klick-Stellen …');const fx=await fxAnalyze(r.video,r.plan,(p,q)=>{$('#busyT').textContent=q!=null?`Feinabstimmung ${Math.round(q*100)} %`:`Suche Klick-Stellen ${Math.round(p*100)} %`;});
   if(fx.found<fx.expected)toast(`Hinweis: ${fx.found} von ${fx.expected} Klick-Stellen erkannt.`);
   return{name:f.name.replace(/\.[^.]+$/,'')+' (Effekte).mp4',type:'video/mp4',bytes:r.video,fx,fxNotes:notes};
@@ -862,7 +872,7 @@ addSource({id:'stage',type:'stage',name:'Stage-Monitor',last:0,draw(now){
 /* ---------- POWERPOINT LIVE (Desktop-App) ---------- */
 const PL={file:null,active:false,slide:0,total:0,black:false,notes:[],app:'',busy:false};
 addSource({id:'pptlive',type:'pptlive',name:'PowerPoint live',draw(){if(this.dirty){this.ctx.clearRect(0,0,W,H);this.dirty=false;}}});
-function plApply(r){if(!r)return;if(r.error&&!r.ended){toast('PowerPoint: '+r.error);}
+function plApply(r){if(!r)return;if(r.error&&!r.ended){toastErr('PowerPoint live:\n'+r.error);}
  if(r.ended){PL.active=false;}else if(r.ok&&r.slide){const ch=r.slide!==PL.slide;PL.active=true;PL.slide=r.slide;PL.total=r.total||PL.total;if(r.black!=null)PL.black=r.black;if(r.app)PL.app=r.app;if(ch)byId.presenter.dirty=true;}
  updPlUI();}
 async function plCmd(cmd,extra={}){if(!NATIVE?.pptLive)return;if(cmd!=='state'&&!PL.active){toast('PowerPoint live ist nicht gestartet.');return;}

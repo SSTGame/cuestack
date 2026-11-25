@@ -219,21 +219,102 @@ function macWorkDir(appName) {
   for (const d of cands) { try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); return d; } catch (e) {} }
   return null;
 }
-async function macConvert(appName, srcFile, outF) {
-  const wd = macWorkDir(appName) || path.dirname(srcFile);
-  const stamp = Date.now() + '_';
-  const inC = path.join(wd, stamp + path.basename(srcFile));
-  const outC = path.join(wd, stamp + path.basename(outF));
-  fs.copyFileSync(srcFile, inC);
-  const as = path.join(os.tmpdir(), 'cuestack-' + appName.replace(/\W/g, '') + '.applescript');
-  fs.writeFileSync(as, AS[appName]);
-  try {
-    await run('osascript', [as, inC, outC]);
-    for (let i = 0; i < 20 && !fs.existsSync(outC); i++) await new Promise(r => setTimeout(r, 250));
-    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt');
-    fs.copyFileSync(outC, outF);
-  } finally { for (const f of [inC, outC]) fs.rm(f, { force: true }, () => {}); }
+/* Mac: Office- und iWork-Apps sind „sandboxed“. Darum wird die Datei wie per Doppelklick über macOS
+   übergeben (open -a → die App darf genau diese Datei öffnen) und das PDF im eigenen Ordner der App
+   gespeichert (dort darf sie immer schreiben). CueStack holt das PDF dort ab. */
+const MAC_CONTAINER = { 'Microsoft PowerPoint': 'com.microsoft.Powerpoint', 'Microsoft Word': 'com.microsoft.Word', Keynote: 'com.apple.iWork.Keynote', Pages: 'com.apple.iWork.Pages', Numbers: 'com.apple.iWork.Numbers' };
+const MAC_EXPORT = {
+  'Microsoft PowerPoint': `on run argv
+  set docName to item 1 of argv
+  set docBase to item 2 of argv
+  set outPath to item 3 of argv
+  tell application "Microsoft PowerPoint"
+    set p to missing value
+    repeat 240 times
+      repeat with x in presentations
+        set n to name of x
+        if n is docName or n is docBase then set p to contents of x
+      end repeat
+      if p is not missing value then exit repeat
+      delay 0.5
+    end repeat
+    if p is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    try
+      save p in outPath as save as PDF
+    on error
+      save p in ((POSIX file outPath) as text) as save as PDF
+    end try
+    close p saving no
+  end tell
+end run`,
+  'Microsoft Word': `on run argv
+  set docName to item 1 of argv
+  set docBase to item 2 of argv
+  set outPath to item 3 of argv
+  tell application "Microsoft Word"
+    set d to missing value
+    repeat 240 times
+      repeat with x in documents
+        set n to name of x
+        if n is docName or n is docBase then set d to contents of x
+      end repeat
+      if d is not missing value then exit repeat
+      delay 0.5
+    end repeat
+    if d is missing value then error "Word hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    save as d file name outPath file format format PDF
+    close d saving no
+  end tell
+end run`,
+};
+for (const a of ['Keynote', 'Pages', 'Numbers']) MAC_EXPORT[a] = `on run argv
+  set docName to item 1 of argv
+  set docBase to item 2 of argv
+  set outPath to item 3 of argv
+  tell application "${a}"
+    set d to missing value
+    repeat 240 times
+      repeat with x in documents
+        set n to name of x
+        if n is docName or n is docBase then set d to contents of x
+      end repeat
+      if d is not missing value then exit repeat
+      delay 0.5
+    end repeat
+    if d is missing value then error "${a} hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    export d to (POSIX file outPath) as PDF
+    close d saving no
+  end tell
+end run`;
+function macAppDir(appName) {
+  const d = path.join(os.homedir(), 'Library', 'Containers', MAC_CONTAINER[appName], 'Data', 'Documents', 'CueStack');
+  try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); return d; }
+  catch (e) { throw new Error(`CueStack darf nicht in den Ordner von ${appName} schreiben (${e.code}). Bitte die macOS-Rückfrage „CueStack möchte auf Daten anderer Apps zugreifen“ erlauben – oder in Systemeinstellungen → Datenschutz & Sicherheit → App-Verwaltung CueStack einschalten.`); }
 }
+async function macConvert(appName, srcFile, outF) {
+  const dir = macAppDir(appName);
+  const docName = 'CueStack_' + Date.now() + path.extname(srcFile).toLowerCase();
+  const docBase = docName.replace(/\.[^.]+$/, '');
+  const inF = path.join(path.dirname(srcFile), docName);
+  const outC = path.join(dir, docBase + '.pdf');
+  fs.copyFileSync(srcFile, inF);
+  const as = path.join(os.tmpdir(), 'cuestack-export-' + appName.replace(/\W/g, '') + '.applescript');
+  fs.writeFileSync(as, MAC_EXPORT[appName]);
+  try {
+    await run('open', ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
+    await run('osascript', [as, docName, docBase, outC], 240000);
+    for (let i = 0; i < 40 && !fs.existsSync(outC); i++) await new Promise(r => setTimeout(r, 250));
+    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt');
+    try { fs.copyFileSync(outC, outF); }
+    catch (e) { throw new Error(`PDF erstellt, aber CueStack darf es nicht lesen (${e.code}). Bitte „Zugriff auf Daten anderer Apps“ für CueStack erlauben.`); }
+  } finally { for (const f of [inF, outC]) fs.rm(f, { force: true }, () => {}); }
+}
+/* Protokoll für Fehler, damit nichts unbemerkt verschwindet */
+function logLine(msg) {
+  try { const d = app.getPath('logs'); fs.mkdirSync(d, { recursive: true }); fs.appendFileSync(path.join(d, 'cuestack.log'), new Date().toISOString() + '  ' + msg + '\n'); } catch (e) {}
+}
+ipcMain.handle('log-path', () => { try { return path.join(app.getPath('logs'), 'cuestack.log'); } catch (e) { return ''; } });
+ipcMain.handle('show-log', () => { try { const f = path.join(app.getPath('logs'), 'cuestack.log'); if (fs.existsSync(f)) shell.showItemInFolder(f); else shell.openPath(app.getPath('logs')); } catch (e) {} return true; });
 const macHas = (appName) => fs.existsSync(`/Applications/${appName}.app`);
 function run(cmd, args, timeout = 180000) {
   return new Promise((resolve, reject) => {
@@ -318,7 +399,7 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
   const inF = path.join(dir, safe), outF = path.join(dir, safe.replace(/\.[^.]+$/, '') + '.pdf');
   fs.writeFileSync(inF, Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength));
   const errors = [];
-  const tryIt = async (label, fn) => { try { await fn(); if (fs.existsSync(outF)) return label; } catch (e) { errors.push(label + ': ' + e.message); } return null; };
+  const tryIt = async (label, fn) => { try { await fn(); if (fs.existsSync(outF)) return label; errors.push(label + ': kein PDF erzeugt'); } catch (e) { errors.push(label + ': ' + e.message); } return null; };
   let via = null;
   const ext = path.extname(safe).toLowerCase();
   if (process.platform === 'win32') {
@@ -327,10 +408,10 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
       await run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps, inF, outF]);
     });
   } else if (process.platform === 'darwin') {
-    const order = /\.(pptx?|ppsx?|odp)$/.test(ext) ? ['Microsoft PowerPoint', 'Keynote']
+    const order = /\.(pptx?|ppsx?|odp)$/.test(ext) ? (macHas('Microsoft PowerPoint') ? ['Microsoft PowerPoint'] : ['Keynote'])
       : ext === '.key' ? ['Keynote']
       : /\.(xlsx?|ods)$/.test(ext) ? ['Numbers']
-      : ['Microsoft Word', 'Pages'];
+      : (macHas('Microsoft Word') ? ['Microsoft Word'] : ['Pages']);
     for (const appName of order) {
       if (via) break;
       if (macHas(appName)) via = await tryIt(appName, () => macConvert(appName, inF, outF));
@@ -341,6 +422,7 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
     if (so) via = await tryIt('LibreOffice', () => run(so, ['--headless', '--convert-to', 'pdf', '--outdir', dir, inF]));
   }
   try {
+    if (!via) logLine('Umwandlung ' + name + ' fehlgeschlagen: ' + errors.join(' | '));
     if (!via) return { error: errors.length ? errors.join(' | ') : 'Kein Programm zum Umwandeln gefunden. Bitte Microsoft PowerPoint, Keynote oder LibreOffice installieren (LibreOffice ist kostenlos). Auf dem Mac beim ersten Mal die Rückfragen „CueStack möchte … steuern“ bzw. „auf Daten anderer Apps zugreifen“ erlauben.' };
     return { pdf: fs.readFileSync(outF), via };
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
@@ -414,11 +496,21 @@ function winBridge() {
 const MAC_LIVE = {
   'Microsoft PowerPoint': {
     open: `on run argv
+  set docName to item 1 of argv
+  set docBase to item 2 of argv
   tell application "Microsoft PowerPoint"
+    set p to missing value
+    repeat 240 times
+      repeat with x in presentations
+        set n to name of x
+        if n is docName or n is docBase then set p to contents of x
+      end repeat
+      if p is not missing value then exit repeat
+      delay 0.5
+    end repeat
+    if p is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    open (POSIX file (item 1 of argv))
-    delay 1
-    set sss to slide show settings of active presentation
+    set sss to slide show settings of p
     set show type of sss to slide show type speaker
     run slide show sss
   end tell
@@ -445,10 +537,20 @@ end tell`,
   },
   Keynote: {
     open: `on run argv
+  set docName to item 1 of argv
+  set docBase to item 2 of argv
   tell application "Keynote"
+    set d to missing value
+    repeat 240 times
+      repeat with x in documents
+        set n to name of x
+        if n is docName or n is docBase then set d to contents of x
+      end repeat
+      if d is not missing value then exit repeat
+      delay 0.5
+    end repeat
+    if d is missing value then error "Keynote hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    set d to open (POSIX file (item 1 of argv))
-    delay 1
     start d from slide 1 of d
   end tell
 end run`,
@@ -478,13 +580,17 @@ function macBridge(appName) {
   let chain = Promise.resolve();
   const send = (c) => (chain = chain.then(async () => {
     try {
-      if (c.cmd === 'open') { await runAs('open', [c.path]); await new Promise(r => setTimeout(r, 1500)); }
+      if (c.cmd === 'open') {
+        const docName = path.basename(c.path), docBase = docName.replace(/\.[^.]+$/, '');
+        await run('open', ['-g', '-a', appName, c.path], 60000);   // macOS übergibt die Datei an die App
+        await runAs('open', [docName, docBase]); await new Promise(r => setTimeout(r, 1500));
+      }
       else if (c.cmd === 'goto') await runAs('goto', [String(c.n)]);
       else if (c.cmd === 'black') await runAs('black', [c.on ? '1' : '0']);
       else if (c.cmd === 'end') { await runAs('end'); return { ok: true, ended: true }; }
       else if (c.cmd !== 'state') await runAs(c.cmd);
       const st = await state(); if (c.cmd === 'black') st.black = !!c.on; return st;
-    } catch (e) { return { ok: false, error: e.message }; }
+    } catch (e) { logLine('PowerPoint live (' + appName + ') ' + c.cmd + ': ' + e.message); return { ok: false, error: e.message }; }
   }));
   return { kind: 'mac', send, close: () => {} };
 }
@@ -500,7 +606,7 @@ ipcMain.handle('ppt-live', async (_e, c) => {
         appName = !isKey && macHas('Microsoft PowerPoint') ? 'Microsoft PowerPoint' : macHas('Keynote') ? 'Keynote' : null;
         if (!appName) return { ok: false, error: 'Weder Microsoft PowerPoint noch Keynote gefunden.' };
       } else if (process.platform !== 'win32') return { ok: false, error: 'PowerPoint live gibt es nur unter Windows und macOS.' };
-      const dir = process.platform === 'darwin' ? (macWorkDir(appName) || os.tmpdir()) : path.join(os.tmpdir(), 'cuestack-live');
+      const dir = path.join(os.tmpdir(), 'cuestack-live');
       fs.mkdirSync(dir, { recursive: true });
       const file = path.join(dir, 'live_' + Date.now() + '_' + safe);
       fs.writeFileSync(file, Buffer.from(c.buf.buffer, c.buf.byteOffset, c.buf.byteLength));

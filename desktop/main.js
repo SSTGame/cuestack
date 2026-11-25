@@ -261,7 +261,9 @@ const MAC_EXPORT = {
     set outPath to item k of argv
     set saved to false
     try
-      tell application "Microsoft PowerPoint" to save thePres in ((POSIX file outPath) as text) as save as PDF
+      with timeout of 900 seconds
+        tell application "Microsoft PowerPoint" to save thePres in ((POSIX file outPath) as text) as save as PDF
+      end timeout
       set saved to true
       set report to report & "HFS gespeichert: " & outPath & linefeed
     on error errA number numA
@@ -269,7 +271,9 @@ const MAC_EXPORT = {
     end try
     if not saved then
       try
-        tell application "Microsoft PowerPoint" to save thePres in outPath as save as PDF
+        with timeout of 900 seconds
+          tell application "Microsoft PowerPoint" to save thePres in outPath as save as PDF
+        end timeout
         set saved to true
         set report to report & "POSIX gespeichert: " & outPath & linefeed
       on error errB number numB
@@ -278,7 +282,7 @@ const MAC_EXPORT = {
     end if
     if saved then
       set found to false
-      repeat 90 times
+      repeat 480 times
         try
           do shell script "test -s " & quoted form of outPath
           set found to true
@@ -297,11 +301,13 @@ const MAC_EXPORT = {
         set report to report & "Datei da (" & lastSize & " Bytes): " & outPath & linefeed
         exit repeat
       else
-        set report to report & "Datei nach 45 s nicht da: " & outPath & linefeed
+        set report to report & "Datei nach 4 min nicht da: " & outPath & linefeed
       end if
     end if
   end repeat
-  tell application "Microsoft PowerPoint" to close thePres saving no
+  try
+    tell application "Microsoft PowerPoint" to close thePres saving no
+  end try
   return report
 end run`,
   'Microsoft Word': `on run argv
@@ -399,10 +405,10 @@ async function macConvert(appName, srcFile, outF) {
   const as = path.join(dir, 'export-' + appName.replace(/\W/g, '') + '.applescript');
   fs.writeFileSync(as, MAC_EXPORT[appName]);
   const short = appName.replace('Microsoft ', '');
-  if (win && !win.isDestroyed()) win.webContents.send('hint', `${short} wandelt um … Falls ${short} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
+  if (win && !win.isDestroyed()) win.webContents.send('hint', `${short} wandelt um – bei großen Präsentationen kann das 1–3 Minuten dauern. Falls ${short} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
   try {
     await run('open', ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
-    const out = await run('osascript', [as, docName, docBase, ...targets], 300000);
+    const out = await run('osascript', [as, docName, docBase, ...targets], 1200000);
     if (out && String(out).trim()) logLine(short + '-Export: ' + String(out).trim().replace(/\n/g, ' | '));
     let hit = null;
     for (let i = 0; i < 40 && !hit; i++) {

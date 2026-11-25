@@ -61,6 +61,10 @@ nav button.isLive .live{display:inline}
 #nextPv{width:100%;aspect-ratio:16/9;border-radius:8px;border:1px solid var(--ln);background:#000;display:block}
 #thumbs{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;margin-top:12px;max-width:980px}
 .th{flex:none;padding:3px;position:relative;background:#000}
+#slDecks{display:grid;gap:4px;margin-top:8px}#slDecks:empty{display:none}
+.dk{display:flex;align-items:center;gap:8px;background:#ffffff0d;border:1px solid #ffffff14;border-radius:10px;padding:6px 8px}
+.dk.cur{border-color:var(--ac)}.dk .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dk button{padding:4px 9px;min-height:0}
+.bdg{font-size:11px;padding:2px 7px;border-radius:99px;background:#ffffff1a;white-space:nowrap}.bdg.ok{background:#1f7a3c}.bdg.wk{background:#7a5a1f}
 .th canvas{display:block;width:144px;height:81px}
 .th span{position:absolute;left:6px;bottom:4px;font-size:11px;background:rgba(0,0,0,.7);padding:0 5px;border-radius:4px}
 .th.cur{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
@@ -211,13 +215,16 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
  <section class="panel" id="p-slides">
   <div class="ph"><h2 id="slTitle">Folien 1</h2><span class="hint" id="slName" style="flex:1"></span><span class="hint" id="slInfo">–</span><button class="toOut">Auf Ausgang ▸</button></div>
   <div class="two">
-   <div class="pv drop" id="pv-slides" data-for="slides"><div class="empty" id="slEmpty">PDF-Präsentation oder Bilder hierher ziehen</div></div>
+   <div class="pv drop" id="pv-slides" data-for="slides"><div class="empty" id="slEmpty">PowerPoint, PDF, Bilder, Videos – oder einen ganzen Ordner – hierher ziehen</div></div>
    <div><div class="hint" style="margin-bottom:4px">Nächste Folie</div><canvas id="nextPv" width="384" height="216"></canvas>
     <div class="row"><button id="slPrev" class="big" style="flex:1">◀</button><button id="slNext" class="big pri" style="flex:1">▶</button></div></div>
   </div>
   <div id="thumbs"></div>
+  <div id="slDecks"></div>
   <div class="row">
-   <button id="slOpen" class="pri">Datei öffnen…</button><input type="file" id="slFile" accept=".pdf,image/*,.heic,.heif,video/mp4,video/webm,.mp4,.webm,.m4v,.mov,.ppt,.pptx,.pps,.ppsx,.key,.odp" multiple hidden>
+   <button id="slOpen" class="pri">Dateien öffnen…</button><input type="file" id="slFile" accept=".pdf,image/*,.heic,.heif,video/mp4,video/webm,.mp4,.webm,.m4v,.mov,.ppt,.pptx,.pps,.ppsx,.key,.odp" multiple hidden>
+   <button id="slDir">Ordner öffnen…</button><input type="file" id="slDirIn" webkitdirectory multiple hidden>
+   <button id="slAdd">+ Hinzufügen…</button><input type="file" id="slAddIn" accept=".pdf,image/*,.heic,.heif,video/mp4,video/webm,.mp4,.webm,.m4v,.mov,.ppt,.pptx,.pps,.ppsx,.key,.odp" multiple hidden>
    <label>Übergang<select id="slTrans"><option value="cut">Schnitt</option><option value="fade" selected>Überblenden</option><option value="dip">Über Schwarz</option><option value="push">Schieben</option><option value="slide">Hineingleiten</option><option value="up">Vertikal</option><option value="zoom">Zoom</option><option value="blur">Unschärfe</option><option value="wipe">Wischen</option></select></label>
    <label>Dauer (s)<input type="number" id="slDur" min="0.1" max="5" step="0.1" value="0.6" style="width:80px"></label>
    <label>Darstellung<select id="slFit"><option value="contain">Einpassen</option><option value="cover">Füllen</option><option value="stretch">Strecken</option></select></label>
@@ -470,22 +477,23 @@ class PageSet{
   for(const it of this.items){if(it.fxv){it.fxv.pause();it.fxv.remove();}if(it.video){it.video.pause();it.video.removeAttribute('src');it.video.load();it.video.remove();}if(it.url)URL.revokeObjectURL(it.url);}}
 }
 async function buildPageSet(files){const items=[];
- for(const f of files){const nt=i=>(f.notes&&f.notes[i])||'';
+ for(let fi=0;fi<files.length;fi++){const f=files[fi],i0=items.length;const nt=i=>(f.notes&&f.notes[i])||'';await (async()=>{
   if(f.fx){const url=URL.createObjectURL(new Blob([f.bytes],{type:'video/mp4'}));const v=document.createElement('video');v.preload='auto';v.playsInline=true;v.src=url;$('#vids').appendChild(v);
-   const ok=await new Promise(r=>{v.onloadeddata=()=>r(true);v.onerror=()=>r(false);});if(!ok){toast('Effekt-Video kann nicht abgespielt werden: '+f.name);v.remove();continue;}
+   const ok=await new Promise(r=>{v.onloadeddata=()=>r(true);v.onerror=()=>r(false);});if(!ok){toast('Effekt-Video kann nicht abgespielt werden: '+f.name);v.remove();return;}
    const per={},tot={};f.fx.stops.forEach(s=>{if(s.kind==='step')tot[s.slide]=(tot[s.slide]||0)+1;});
    for(const s of f.fx.stops){const k=s.kind==='step'?(per[s.slide]=(per[s.slide]||0)+1):0;
     items.push({fxv:v,url,at:s.at,res:s.res,w:v.videoWidth,h:v.videoHeight,slide:s.slide,
      label:`Folie ${s.slide}`+(s.kind==='step'?` · vor Animation ${k}/${tot[s.slide]}`:''),note:(f.fxNotes&&f.fxNotes[s.slide-1])||''});}
-   continue;}
+   return;}
   if(isPdf(f)){const lib=await loadPdfLib();const pdf=await lib.getDocument({data:new Uint8Array(f.bytes.slice(0))}).promise;
    for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const v=pg.getViewport({scale:1});items.push({pdf,no:p,w:v.width,h:v.height,note:nt(p-1)});}}
   else if(isImg(f)){const img=await createImageBitmap(new Blob([f.bytes],{type:f.type||'image/png'}));items.push({img,w:img.width,h:img.height,note:nt(0)});}
   else if(isVid(f)){const url=URL.createObjectURL(new Blob([f.bytes],{type:f.type||'video/mp4'}));const v=document.createElement('video');
    v.preload='auto';v.playsInline=true;v.src=url;$('#vids').appendChild(v);
    const ok=await new Promise(r=>{v.onloadedmetadata=()=>r(true);v.onerror=()=>r(false);});
-   if(!ok||!v.videoWidth){toast('Video kann nicht abgespielt werden (bitte MP4/H.264 oder WebM): '+f.name);v.remove();URL.revokeObjectURL(url);continue;}
-   items.push({video:v,url,w:v.videoWidth,h:v.videoHeight});}}
+   if(!ok||!v.videoWidth){toast('Video kann nicht abgespielt werden (bitte MP4/H.264 oder WebM): '+f.name);v.remove();URL.revokeObjectURL(url);return;}
+   items.push({video:v,url,w:v.videoWidth,h:v.videoHeight});}})();
+  for(let k=i0;k<items.length;k++)items[k].fi=fi;}
  if(!items.length)throw new Error('Keine Seiten gefunden.');return new PageSet(items);}
 /* Mini-ZIP-Leser + Sprechernotizen aus .pptx */
 async function unzip(buf,wanted){const u8=buf instanceof Uint8Array?buf:new Uint8Array(buf),dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
@@ -508,16 +516,43 @@ async function pptxNotes(buf,all=false){const F=await unzip(buf,n=>/^ppt\/(prese
      for(const pa of sp.getElementsByTagNameNS('*','p'))out.push([...pa.getElementsByTagNameNS('*','t')].map(t=>t.textContent).join(''));}
     txt=out.join('\n').replace(/\n{3,}/g,'\n\n').trim();}}
   res.push(txt);}return res;}
-async function readFiles(list,allowVid,opts={}){const arr=[...list].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const out=[];
- for(const f of arr){
-  if(opts.fx&&/\.(pptx|ppsx|ppt|pps)$/i.test(f.name)&&NATIVE?.fxPrepare){const r=await fxFromPptx(f);if(r){out.push(r);continue;}}
-  if(isOffice(f)&&NATIVE?.convertOffice){busy('Wandle „'+f.name+'“ um …');
-   try{const ab=await f.arrayBuffer();let notes=null;if(/\.(pptx|ppsx)$/i.test(f.name)){try{notes=await pptxNotes(ab);}catch(e){}}
-    const r=await NATIVE.convertOffice(f.name,ab);if(r.error)throw new Error(r.error);
-    busy(null);out.push({name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',bytes:r.pdf,notes});toast('„'+f.name+'“ umgewandelt ('+r.via+')'+(notes&&notes.some(Boolean)?' – inkl. Sprechernotizen.':'.'));}
-   catch(e){busy(null);toastErr('Umwandlung von „'+f.name+'“ fehlgeschlagen:\n'+e.message);}continue;}
-  if(isHeicF(f)){try{out.push(await normFile({name:f.name,type:f.type,bytes:await f.arrayBuffer()}));}catch(e){toast('HEIC-Umwandlung fehlgeschlagen: '+e.message);}continue;}
-  if(!isPdf(f)&&!isImg(f)&&!(allowVid&&isVid(f))){toast(officeHint(f.name));continue;}out.push({name:f.name,type:f.type,bytes:await f.arrayBuffer()});}return out;}
+const natSort=(a,b)=>(a.webkitRelativePath||a._path||a.name).localeCompare(b.webkitRelativePath||b._path||b.name,undefined,{numeric:true,sensitivity:'base'});
+const junkF=f=>/^(\.|~\$)/.test(f.name)||/(^|\/)(__MACOSX|\.)/.test(f.webkitRelativePath||f._path||'');
+async function readFiles(list,allowVid,opts={}){const arr=[...list].filter(f=>!junkF(f)).sort(natSort);const res=new Array(arr.length);
+ const offs=arr.filter(f=>isOffice(f)&&NATIVE?.convertOffice&&!(opts.fx&&/\.(pptx|ppsx|ppt|pps)$/i.test(f.name)&&NATIVE?.fxPrepare)).length;let done=0;
+ const prog=()=>{if(offs)busy(offs>1?`Lade Präsentationen … ${done} / ${offs}`:'Lade Präsentation …',PLAT==='darwin'?'Schnelle Vorschau – die 1:1-Version von PowerPoint kommt danach im Hintergrund.':'');};
+ const one=async(f)=>{
+  if(opts.fx&&/\.(pptx|ppsx|ppt|pps)$/i.test(f.name)&&NATIVE?.fxPrepare){const r=await fxFromPptx(f);if(r)return[r];}
+  if(isOffice(f)&&NATIVE?.convertOffice){try{const r=await convOffice(f);done++;prog();return[r];}catch(e){done++;prog();toastErr('Umwandlung von „'+f.name+'“ fehlgeschlagen:\n'+e.message);return[];}}
+  if(isHeicF(f)){try{return[await normFile({name:f.name,type:f.type,bytes:await f.arrayBuffer()})];}catch(e){toast('HEIC-Umwandlung fehlgeschlagen: '+e.message);return[];}}
+  if(!isPdf(f)&&!isImg(f)&&!(allowVid&&isVid(f))){if(!opts.quiet)toast(officeHint(f.name));return[];}return[{name:f.name,type:f.type,bytes:await f.arrayBuffer()}];};
+ prog();let next=0;const worker=async()=>{while(next<arr.length){const k=next++;res[k]=await one(arr[k]);}};
+ await Promise.all((PLAT==='darwin'?[0,1,2]:[0]).map(worker));if(offs)busy(null);return res.flat();}
+/* Office: auf dem Mac sofort eine schnelle Vorschau, die 1:1-Fassung von PowerPoint kommt im Hintergrund nach und ersetzt sie.
+   Fertige 1:1-Fassungen werden gespeichert (gleiche Datei = sofort da). */
+const hashOf=async ab=>[...new Uint8Array(await crypto.subtle.digest('SHA-1',ab))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const HQ={q:[],busy:null,src:new Map(),fail:new Set()};
+async function convOffice(f){const ab=await f.arrayBuffer();let notes=null;if(/\.(pptx|ppsx)$/i.test(f.name)){try{notes=await pptxNotes(ab);}catch(e){}}
+ const hash=await hashOf(ab),base={name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',notes,src:{name:f.name,hash}};
+ const cached=await idb.get('conv:'+hash);if(cached)return{...base,bytes:cached,q:'hq'};
+ if(PLAT==='darwin'){const r=await NATIVE.convertOffice(f.name,ab,'fast');
+  if(!r.error){HQ.src.set(hash,{name:f.name,ab});hqQueue(hash);return{...base,bytes:r.pdf,q:'preview'};}}
+ const r=await NATIVE.convertOffice(f.name,ab,'hq');if(r.error)throw new Error(r.error);
+ idb.set('conv:'+hash,r.pdf);return{...base,bytes:r.pdf,q:'hq'};}
+function hqQueue(h,visible=false){HQ.fail.delete(h);if(HQ.busy!==h&&!HQ.q.some(x=>x.h===h))HQ.q.push({h,visible});hqRun();updDeckList();}
+async function hqRun(){if(HQ.busy)return;const job=HQ.q.shift();if(!job)return;HQ.busy=job.h;updDeckList();const s=HQ.src.get(job.h);
+ try{if(!s)throw new Error('Originaldatei nicht mehr im Speicher');const r=await NATIVE.convertOffice(s.name,s.ab,'hq',job.visible);if(r.error)throw new Error(r.error);
+  await idb.set('conv:'+job.h,r.pdf);await hqApply(job.h,r.pdf);toast('„'+s.name+'“ ist jetzt 1:1 (PowerPoint).');}
+ catch(e){HQ.fail.add(job.h);console.warn('1:1 fehlgeschlagen',e);if(job.visible)toastErr('1:1-Umwandlung von „'+(s?.name||'')+'“ fehlgeschlagen:\n'+e.message);}
+ HQ.busy=null;updDeckList();hqRun();}
+async function hqApply(h,pdf){for(const st of SL){let ch=false;const files=st.files.map(f=>f.src?.hash===h&&f.q!=='hq'?(ch=true,{...f,bytes:pdf,q:'hq'}):f);if(ch)await setSlideFiles(files,st.idx,null,st);}}
+async function hqRestore(){for(const st of SL){let ch=false;const files=[];for(const f of st.files){const c=f.q==='preview'&&f.src&&await idb.get('conv:'+f.src.hash);if(c){ch=true;files.push({...f,bytes:c,q:'hq'});}else files.push(f);}if(ch)await setSlideFiles(files,st.idx,null,st);}}
+/* Ordner per Drag & Drop: alle Dateien darin (auch Unterordner) */
+async function dropFiles(dt){const its=[...(dt.items||[])].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+ if(!its.some(e=>e.isDirectory))return[...dt.files];const out=[];
+ const walk=async(e,p)=>{if(e.isFile){const f=await new Promise((r,j)=>e.file(r,j));try{Object.defineProperty(f,'_path',{value:p+f.name});}catch(x){}out.push(f);}
+  else if(e.isDirectory){const rd=e.createReader();let batch;do{batch=await new Promise((r,j)=>rd.readEntries(r,j));for(const c of batch)await walk(c,p+e.name+'/');}while(batch.length);}};
+ for(const e of its)await walk(e,'');return out;}
 const isOffice=f=>/\.(pptx?|ppsx?|key|docx?|odt|odp|rtf|xlsx?|ods)$/i.test(f.name);
 
 /* ---------- TIMER ---------- */
@@ -670,7 +705,7 @@ async function setSlideFiles(files,idx=0,notes=null,st=S){const S=st;if(!files.l
   idb.set(slideKey(S),files);saveSoon();
  }catch(e){toast(e.message);}
  if(S===PV.uiS()){updSlidePanel();}}
-function updSlidePanel(){$('#slTitle').textContent='Folien '+S.n;$('#slEmpty').style.display=S.ps?'none':'';$('#slEmpty').textContent='PDF, PowerPoint, Bilder oder Videos hierher ziehen';
+function updSlidePanel(){$('#slTitle').textContent='Folien '+S.n;$('#slEmpty').style.display=S.ps?'none':'';$('#slEmpty').textContent='PowerPoint, PDF, Bilder, Videos – oder einen ganzen Ordner – hierher ziehen';
  $('#slName').textContent=S.files.map(f=>f.name).join(', ');syncSlideInputs();buildThumbs();}
 async function buildThumbs(){const box=$('#thumbs');box.innerHTML='';if(!S.ps){updSlideUI();return;}const ps=S.ps;
  for(let i=0;i<ps.n;i++){const b=document.createElement('button');b.className='th';b.dataset.i=i;b.title='Folie '+(i+1);b.appendChild(mk(288,162));const sp=document.createElement('span');sp.textContent=i+1;b.appendChild(sp);box.appendChild(b);}
@@ -678,7 +713,7 @@ async function buildThumbs(){const box=$('#thumbs');box.innerHTML='';if(!S.ps){u
 function drawNext(){const cv=$('#nextPv'),x=cv.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,cv.width,cv.height);if(!S.ps)return;
  let n=S.idx+1;if(n>=S.ps.n){if(!S.loop){x.fillStyle='#8d95a8';x.font='16px system-ui';x.textAlign='center';x.fillText('Ende',cv.width/2,cv.height/2);return;}n=0;}
  const it=S.ps.items[n],img=S.ps.get(n,W);if(!img)return;const[a,b,w,h]=fitRect(it.w,it.h,cv.width,cv.height,'contain');x.drawImage(img,a,b,w,h);}
-function updSlideUI(){const lab=(D2)=>D2.ps?(D2.ps.items[D2.idx]?.label?`${D2.ps.items[D2.idx].label} · Schritt ${D2.idx+1}/${D2.ps.n}`:`Folie ${D2.idx+1} / ${D2.ps.n}`):'–';$('#slInfo').textContent=lab(S);
+function updSlideUI(){updDeckList();const lab=(D2)=>D2.ps?(D2.ps.items[D2.idx]?.label?`${D2.ps.items[D2.idx].label} · Schritt ${D2.idx+1}/${D2.ps.n}`:`Folie ${D2.idx+1} / ${D2.ps.n}`):'–';$('#slInfo').textContent=lab(S);
  const F=FS,na=$('#prNotes');if(na&&document.activeElement!==na)na.value=F.ps?(F.notes[F.idx]||''):'';
  $('#prInfo').textContent=F.ps?`Folien ${F.n} · `+lab(F):'Keine Folien geladen';byId.presenter&&(byId.presenter.dirty=true);
  $$('#thumbs .th').forEach(b=>b.classList.toggle('cur',+b.dataset.i===S.idx));const cur=$('#thumbs .th.cur');if(cur)cur.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});drawNext();}
@@ -1140,6 +1175,24 @@ $('#pv-doc').addEventListener('wheel',e=>{if(!D.ps)return;e.preventDefault();D.t
 /* Folien */
 $('#slOpen').onclick=()=>$('#slFile').click();
 $('#slFile').onchange=async e=>{const fl=[...e.target.files];e.target.value='';setSlideFiles(await readFiles(fl,true,{fx:$('#slFx').checked}));};
+$('#slDir').onclick=()=>$('#slDirIn').click();
+$('#slDirIn').onchange=async e=>{const fl=[...e.target.files];e.target.value='';const f=await readFiles(fl,true,{fx:$('#slFx').checked,quiet:true});if(f.length)setSlideFiles(f);else toast('Im Ordner wurden keine passenden Dateien gefunden.');};
+$('#slAdd').onclick=()=>$('#slAddIn').click();
+$('#slAddIn').onchange=async e=>{const fl=[...e.target.files];e.target.value='';const st=S,f=await readFiles(fl,true,{fx:$('#slFx').checked});if(f.length)setSlideFiles([...st.files,...f],st.idx,null,st);};
+function deckRanges(st){const r=[];if(!st.ps)return r;st.ps.items.forEach((it,k)=>{const fi=it.fi??0;if(!r[fi])r[fi]={a:k,b:k};else r[fi].b=k;});return r;}
+function updDeckList(){const box=$('#slDecks');if(!box)return;const st=S;if(!st.ps||st.files.length<1){box.innerHTML='';return;}
+ const rg=deckRanges(st),curFi=st.ps.items[st.idx]?.fi??0,esc=t=>String(t).replace(/[<>&"]/g,c=>'&#'+c.charCodeAt(0)+';');
+ box.innerHTML=st.files.map((f,i)=>{const r=rg[i],h=f.src?.hash;let b='';
+  if(f.q==='hq')b='<span class="bdg ok">1:1</span>';
+  else if(f.q==='preview')b=HQ.busy===h?'<span class="bdg wk">1:1 wird erstellt …</span>':HQ.q.some(x=>x.h===h)?'<span class="bdg wk">1:1 folgt</span>':'<span class="bdg">Vorschau</span>'+(HQ.src.has(h)&&NATIVE?`<button data-hq="${i}" title="PowerPoint öffnet sich kurz sichtbar – ggf. „Zugriff gewähren“ klicken">1:1 mit PowerPoint</button>`:'');
+  return `<div class="dk${i===curFi?' cur':''}"><span class="hint" style="margin:0;width:22px">${i+1}.</span><span class="nm" title="${esc(f.src?.name||f.name)}">${esc(f.src?.name||f.name)}</span>${b}<span class="hint" style="margin:0">${r?(r.a===r.b?'Folie '+(r.a+1):'Folien '+(r.a+1)+'–'+(r.b+1)):'–'}</span>
+   <button data-go="${i}" title="Hier starten">▶</button><button data-up="${i}" title="Nach oben"${i?'':' disabled'}>↑</button><button data-dn="${i}" title="Nach unten"${i<st.files.length-1?'':' disabled'}>↓</button><button data-rm="${i}" title="Entfernen">✕</button></div>`;}).join('');}
+$('#slDecks').onclick=e=>{const b=e.target.closest('button');if(!b)return;const st=S,fs=[...st.files];
+ if(b.dataset.go!=null){const r=deckRanges(st)[+b.dataset.go];if(r)slideGo(r.a,st);return;}
+ if(b.dataset.hq!=null){const h=fs[+b.dataset.hq].src?.hash;if(h)hqQueue(h,true);return;}
+ const curFi=st.ps?.items[st.idx]?.fi??0;
+ if(b.dataset.rm!=null){const i=+b.dataset.rm;fs.splice(i,1);if(!fs.length){if(st.ps)st.ps.dispose();st.ps=null;st.files=[];idb.set(slideKey(st),[]);saveSoon();updSlidePanel();byId[st.id].dirty=true;return;}setSlideFiles(fs,0,null,st);return;}
+ const i=b.dataset.up!=null?+b.dataset.up:+b.dataset.dn,j=b.dataset.up!=null?i-1:i+1;[fs[i],fs[j]]=[fs[j],fs[i]];setSlideFiles(fs,0,null,st);};
 $('#slAudio').onchange=e=>{S.audio=e.target.checked;const v=curVideo();if(v)v.muted=!S.audio;saveSoon();};
 $('#slVidNext').onchange=e=>{S.vidNext=e.target.checked;saveSoon();};
 $('#slVidLoop').onchange=e=>{S.vidLoop=e.target.checked;const v=curVideo();if(v)v.loop=S.vidLoop;saveSoon();};
@@ -1153,7 +1206,7 @@ $('#slAuto').onchange=e=>{S.auto=e.target.checked;S.lastAuto=Date.now();saveSoon
 $('#slLoop').onchange=e=>{S.loop=e.target.checked;drawNext();saveSoon();};
 /* Drag & Drop */
 for(const z of $$('.drop')){z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag');});z.addEventListener('dragleave',()=>z.classList.remove('drag'));
- z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const f=z.dataset.for==='slides'?await readFiles(e.dataTransfer.files,true,{fx:$('#slFx').checked}):z.dataset.for==='med'?await Promise.all([...e.dataTransfer.files].slice(0,1).map(async x=>({name:x.name,type:x.type,bytes:await x.arrayBuffer()}))):await readFiles(e.dataTransfer.files,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else if(z.dataset.for==='med'){const s=byId[curView];if(s?.type==='med')medLoad(s,f[0]);}else setSlideFiles(f);});}
+ z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const dl=z.dataset.for==='med'?null:await dropFiles(e.dataTransfer);const f=z.dataset.for==='slides'?await readFiles(dl,true,{fx:$('#slFx').checked,quiet:dl.length>1}):z.dataset.for==='med'?await Promise.all([...e.dataTransfer.files].slice(0,1).map(async x=>({name:x.name,type:x.type,bytes:await x.arrayBuffer()}))):await readFiles(dl,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else if(z.dataset.for==='med'){const s=byId[curView];if(s?.type==='med')medLoad(s,f[0]);}else setSlideFiles(f);});}
 /* Lyrics */
 $('#lySty').innerHTML=LSTY.map((s,i)=>`<option value="${i}">${i+1}. ${s.n}</option>`).join('');
 $('#lySty').onchange=e=>{LY.style=+e.target.value;byId.lyrics.dirty=true;saveSoon();};
@@ -1289,7 +1342,7 @@ async function initNative(){const nb=$('#nativeBox');
  if(NATIVE.onPickSource)NATIVE.onPickSource(pickerModal);
  if(NATIVE.onHint)NATIVE.onHint(m=>busy(m));
  const info=await NATIVE.info();PLAT=info.platform||'';$('#slFxBox').style.display='';
- if(PLAT==='darwin'){$('#slFx').checked=false;$('#slFx').disabled=true;$('#slFxHint').textContent='Effekte vorbereiten braucht PowerPoint für Windows – Microsoft erlaubt auf dem Mac keinen automatischen Videoexport. Unter Windows vorbereitete Shows (Show-Datei) laufen hier aber mit allen Effekten.';}
+ if(PLAT==='darwin'){$('#slFx').checked=false;$('#slFx').disabled=true;$('#slFxBox').style.display='none';$('#slFxHint').textContent='Effekte vorbereiten braucht PowerPoint für Windows – Microsoft erlaubt auf dem Mac keinen automatischen Videoexport. Unter Windows vorbereitete Shows (Show-Datei) laufen hier aber mit allen Effekten.';}
  const fill=async()=>{const ds=await NATIVE.displays();screens=ds.map(d=>({...d,isPrimary:d.primary,width:d.bounds.width,height:d.bounds.height}));fillScreens();};
  await fill();NATIVE.onDisplaysChanged&&NATIVE.onDisplaysChanged(fill);$('#scrDetect').textContent='Neu laden';$('#scrDetect').onclick=fill;
  nb.innerHTML=`<div class="row" style="margin-top:0"><button id="addNdi" class="pri">+ NDI-Ausgang</button>
@@ -1328,7 +1381,7 @@ function initUpdates(info){const nb=$('#nativeBox');const d=document.createEleme
 /* ---------- START ---------- */
 (async()=>{show('timer');syncInputs();requestAnimationFrame(frame);try{await initNative();}catch(e){console.error(e);}
  const st=await idb.get('state');if(!st)return;
- const outs=await applySnap(st,k=>idb.get(k));
+ const outs=await applySnap(st,k=>idb.get(k));try{await hqRestore();}catch(e){}
  const mf=await idb.get('mediaFiles');if(Array.isArray(mf))for(let i=0;i<MED.length;i++)if(mf[i])await medLoad(MED[i],mf[i]);
  show(curView);toast('Letzte Sitzung wiederhergestellt.');offerOuts(outs);})();
 }

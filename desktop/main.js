@@ -247,17 +247,12 @@ const MAC_EXPORT = {
       if thePres is not missing value then exit repeat
       delay 0.5
     end repeat
-    if thePres is missing value then
-      try
-        if (count of presentations) > 0 then set thePres to active presentation
-      end try
-    end if
     if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
-    activate
   end tell
+  if (item 3 of argv) is "1" then tell application "Microsoft PowerPoint" to activate
   -- PowerPoint speichert das PDF im Hintergrund: erst warten, bis die Datei wirklich da ist, dann schließen
   set report to ""
-  repeat with k from 3 to count of argv
+  repeat with k from 4 to count of argv
     set outPath to item k of argv
     set saved to false
     try
@@ -282,7 +277,7 @@ const MAC_EXPORT = {
     end if
     if saved then
       set found to false
-      repeat 480 times
+      repeat 120 times
         try
           do shell script "test -s " & quoted form of outPath
           set found to true
@@ -301,7 +296,7 @@ const MAC_EXPORT = {
         set report to report & "Datei da (" & lastSize & " Bytes): " & outPath & linefeed
         exit repeat
       else
-        set report to report & "Datei nach 4 min nicht da: " & outPath & linefeed
+        set report to report & "Datei nach 60 s nicht da: " & outPath & linefeed
       end if
     end if
   end repeat
@@ -387,15 +382,14 @@ function macExchangeDir() {
 function macTargets(appName, base) {
   const h = os.homedir(), t = [];
   if (/^Microsoft/.test(appName)) {
-    t.push(path.join(h, 'Library/Group Containers/UBF8T346G9.Office', base + '.pdf'));
     const c = MAC_CONTAINER[appName];
-    if (c) t.push(path.join(h, 'Library/Containers', c, 'Data/Library/Caches', base + '.pdf'));
-    t.push(path.join(h, 'Downloads', base + '.pdf'));
+    if (c) { const d = path.join(h, 'Library/Containers', c, 'Data/Library/Caches'); t.push(path.join(d, base + '.pdf')); }
+    t.push(path.join(h, 'Library/Group Containers/UBF8T346G9.Office', base + '.pdf'));
   }
   t.push(path.join(macExchangeDir(), base + '.pdf'));
   return t;
 }
-async function macConvert(appName, srcFile, outF) {
+async function macConvert(appName, srcFile, outF, visible = false) {
   const dir = macExchangeDir();
   const docName = 'CueStack_' + Date.now() + path.extname(srcFile).toLowerCase();
   const docBase = docName.replace(/\.[^.]+$/, '');
@@ -405,10 +399,11 @@ async function macConvert(appName, srcFile, outF) {
   const as = path.join(dir, 'export-' + appName.replace(/\W/g, '') + '.applescript');
   fs.writeFileSync(as, MAC_EXPORT[appName]);
   const short = appName.replace('Microsoft ', '');
-  if (win && !win.isDestroyed()) win.webContents.send('hint', `${short} wandelt um – bei großen Präsentationen kann das 1–3 Minuten dauern. Falls ${short} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
+  if (visible && win && !win.isDestroyed()) win.webContents.send('hint', `${short} wandelt um – bei großen Präsentationen kann das 1–3 Minuten dauern. Falls ${short} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
   try {
-    await run('open', ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
-    const out = await run('osascript', [as, docName, docBase, ...targets], 1200000);
+    await run('open', visible ? ['-a', appName, inF] : ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
+    const isPpt = /PowerPoint/.test(appName);
+    const out = await run('osascript', isPpt ? [as, docName, docBase, visible ? '1' : '0', ...targets] : [as, docName, docBase, ...targets], 900000);
     if (out && String(out).trim()) logLine(short + '-Export: ' + String(out).trim().replace(/\n/g, ' | '));
     let hit = null;
     for (let i = 0; i < 40 && !hit; i++) {
@@ -437,7 +432,7 @@ async function macConvert(appName, srcFile, outF) {
     if (!hit) throw new Error('PDF wurde nicht erzeugt (alle Ablageorte geprüft, siehe Protokoll)');
   } finally {
     for (const f of [inF, ...targets]) fs.rm(f, { force: true }, () => {});
-    setTimeout(() => { if (win && !win.isDestroyed()) win.focus(); }, 300);
+    if (visible) setTimeout(() => { if (win && !win.isDestroyed()) win.focus(); }, 300);
   }
 }
 /* Ersatz ohne PowerPoint: macOS-Vorschau (Quick Look) erzeugt eine Vorschau der Präsentation */
@@ -543,12 +538,12 @@ ipcMain.handle('fx-prepare', async (_e, { name, buf, height }) => {
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 });
 
-ipcMain.handle('convert-office', async (_e, { name, buf }) => {
+ipcMain.handle('convert-office', async (_e, { name, buf, mode, visible }) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cuestack-'));
   const safe = String(name).replace(/[^\w.\- ]+/g, '_');
   const inF = path.join(dir, safe), outF = path.join(dir, safe.replace(/\.[^.]+$/, '') + '.pdf');
   fs.writeFileSync(inF, Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength));
-  const errors = [];
+  const errors = [], t0 = Date.now();
   const tryIt = async (label, fn) => { try { await fn(); if (fs.existsSync(outF)) return label; errors.push(label + ': kein PDF erzeugt'); } catch (e) { errors.push(label + ': ' + e.message); } return null; };
   let via = null;
   const ext = path.extname(safe).toLowerCase();
@@ -557,6 +552,8 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
       const ps = path.join(dir, 'convert.ps1'); fs.writeFileSync(ps, '\ufeff' + PS_SCRIPT, 'utf8');
       await run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps, inF, outF]);
     });
+  } else if (process.platform === 'darwin' && mode === 'fast') {
+    if (/\.(pptx?|ppsx?|key|docx?|xlsx?)$/.test(ext)) via = await tryIt('macOS-Vorschau', () => macQuickLook(inF, outF));
   } else if (process.platform === 'darwin') {
     const order = /\.(pptx?|ppsx?|odp)$/.test(ext) ? (macHas('Microsoft PowerPoint') ? ['Microsoft PowerPoint'] : ['Keynote'])
       : ext === '.key' ? ['Keynote']
@@ -564,15 +561,16 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
       : (macHas('Microsoft Word') ? ['Microsoft Word'] : ['Pages']);
     for (const appName of order) {
       if (via) break;
-      if (macHas(appName)) via = await tryIt(appName, () => macConvert(appName, inF, outF));
+      if (macHas(appName)) via = await tryIt(appName, () => macConvert(appName, inF, outF, !!visible));
     }
   }
-  if (!via) {
+  if (!via && mode !== 'fast') {
     const so = findSoffice();
     if (so) via = await tryIt('LibreOffice', () => run(so, ['--headless', '--convert-to', 'pdf', '--outdir', dir, inF]));
   }
-  if (!via && process.platform === 'darwin' && /\.(pptx?|ppsx?|key|docx?|xlsx?)$/.test(ext)) via = await tryIt('macOS-Vorschau', () => macQuickLook(inF, outF));
+  if (!via && !mode && process.platform === 'darwin' && /\.(pptx?|ppsx?|key|docx?|xlsx?)$/.test(ext)) via = await tryIt('macOS-Vorschau', () => macQuickLook(inF, outF));
   try {
+    if (via) logLine('  Dauer ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
     if (!via) logLine('Umwandlung ' + name + ' fehlgeschlagen: ' + errors.join(' | '));
     else logLine('Umwandlung ' + name + ' ok über ' + via + (errors.length ? ' (vorher: ' + errors.join(' | ') + ')' : ''));
     if (!via) return { error: errors.length ? errors.join(' | ') : 'Kein Programm zum Umwandeln gefunden. Bitte Microsoft PowerPoint, Keynote oder LibreOffice installieren (LibreOffice ist kostenlos). Auf dem Mac beim ersten Mal die Rückfragen „CueStack möchte … steuern“ bzw. „auf Daten anderer Apps zugreifen“ erlauben.' };

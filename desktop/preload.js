@@ -26,5 +26,5 @@ contextBridge.exposeInMainWorld('CueNative', {
   updateCheck: () => ipcRenderer.invoke('update-check'),
   updateInstall: () => ipcRenderer.invoke('update-install'),
   onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (_e, m) => cb(m)),
-  convertOffice: (name, buf) => ipcRenderer.invoke('convert-office', { name, buf: new Uint8Array(buf) }),
+  convertOffice: (name, buf, mode, visible) => ipcRenderer.invoke('convert-office', { name, buf: new Uint8Array(buf), mode, visible }),
 });

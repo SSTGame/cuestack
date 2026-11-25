@@ -229,23 +229,23 @@ const MAC_EXPORT = {
   set docBase to item 2 of argv
   set outPath to item 3 of argv
   tell application "Microsoft PowerPoint"
-    set p to missing value
+    set thePres to missing value
     repeat 240 times
-      repeat with x in presentations
-        set n to name of x
-        if n is docName or n is docBase then set p to contents of x
+      repeat with oneItem in presentations
+        set itemName to name of oneItem
+        if itemName is docName or itemName is docBase then set thePres to contents of oneItem
       end repeat
-      if p is not missing value then exit repeat
+      if thePres is not missing value then exit repeat
       delay 0.5
     end repeat
-    if p is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
     try
-      save p in outPath as save as PDF
+      save thePres in outPath as save as PDF
     on error
-      save p in ((POSIX file outPath) as text) as save as PDF
+      save thePres in ((POSIX file outPath) as text) as save as PDF
     end try
-    close p saving no
+    close thePres saving no
   end tell
 end run`,
   'Microsoft Word': `on run argv
@@ -253,19 +253,19 @@ end run`,
   set docBase to item 2 of argv
   set outPath to item 3 of argv
   tell application "Microsoft Word"
-    set d to missing value
+    set theDoc to missing value
     repeat 240 times
-      repeat with x in documents
-        set n to name of x
-        if n is docName or n is docBase then set d to contents of x
+      repeat with oneItem in documents
+        set itemName to name of oneItem
+        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
       end repeat
-      if d is not missing value then exit repeat
+      if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
-    if d is missing value then error "Word hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    if theDoc is missing value then error "Word hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    save as d file name outPath file format format PDF
-    close d saving no
+    save as theDoc file name outPath file format format PDF
+    close theDoc saving no
   end tell
 end run`,
 };
@@ -274,18 +274,18 @@ for (const a of ['Keynote', 'Pages', 'Numbers']) MAC_EXPORT[a] = `on run argv
   set docBase to item 2 of argv
   set outPath to item 3 of argv
   tell application "${a}"
-    set d to missing value
+    set theDoc to missing value
     repeat 240 times
-      repeat with x in documents
-        set n to name of x
-        if n is docName or n is docBase then set d to contents of x
+      repeat with oneItem in documents
+        set itemName to name of oneItem
+        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
       end repeat
-      if d is not missing value then exit repeat
+      if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
-    if d is missing value then error "${a} hat die Datei nicht geöffnet (Zeitüberschreitung)."
-    export d to (POSIX file outPath) as PDF
-    close d saving no
+    if theDoc is missing value then error "${a} hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    export theDoc to (POSIX file outPath) as PDF
+    close theDoc saving no
   end tell
 end run`;
 /* Austauschordner gehört CueStack selbst – dorthin darf CueStack immer schreiben. PowerPoint fragt beim
@@ -506,20 +506,20 @@ const MAC_LIVE = {
   set docName to item 1 of argv
   set docBase to item 2 of argv
   tell application "Microsoft PowerPoint"
-    set p to missing value
+    set thePres to missing value
     repeat 240 times
-      repeat with x in presentations
-        set n to name of x
-        if n is docName or n is docBase then set p to contents of x
+      repeat with oneItem in presentations
+        set itemName to name of oneItem
+        if itemName is docName or itemName is docBase then set thePres to contents of oneItem
       end repeat
-      if p is not missing value then exit repeat
+      if thePres is not missing value then exit repeat
       delay 0.5
     end repeat
-    if p is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    set sss to slide show settings of p
-    set show type of sss to slide show type speaker
-    run slide show sss
+    set showSettings to slide show settings of thePres
+    set show type of showSettings to slide show type speaker
+    run slide show showSettings
   end tell
 end run`,
     next: 'tell application "Microsoft PowerPoint" to go to next slide slide show view of slide show window 1',
@@ -537,8 +537,8 @@ end run`,
   end tell
 end run`,
     state: `tell application "Microsoft PowerPoint"
-  set v to slide show view of slide show window 1
-  return ((slide index of slide of v) as text) & "/" & ((count of slides of active presentation) as text)
+  set theView to slide show view of slide show window 1
+  return ((slide index of slide of theView) as text) & "/" & ((count of slides of active presentation) as text)
 end tell`,
     end: 'tell application "Microsoft PowerPoint" to exit slide show slide show view of slide show window 1',
   },
@@ -547,18 +547,18 @@ end tell`,
   set docName to item 1 of argv
   set docBase to item 2 of argv
   tell application "Keynote"
-    set d to missing value
+    set theDoc to missing value
     repeat 240 times
-      repeat with x in documents
-        set n to name of x
-        if n is docName or n is docBase then set d to contents of x
+      repeat with oneItem in documents
+        set itemName to name of oneItem
+        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
       end repeat
-      if d is not missing value then exit repeat
+      if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
-    if d is missing value then error "Keynote hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    if theDoc is missing value then error "Keynote hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    start d from slide 1 of d
+    start theDoc from slide 1 of theDoc
   end tell
 end run`,
     next: 'tell application "Keynote" to show next',

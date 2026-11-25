@@ -254,28 +254,54 @@ const MAC_EXPORT = {
     end if
     if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    set report to ""
-    repeat with k from 3 to count of argv
-      set outPath to item k of argv
-      set okFlag to false
-      try
-        save thePres in ((POSIX file outPath) as text) as save as PDF
-        set okFlag to true
-        set report to report & "HFS ok: " & outPath & linefeed
-      on error errA number numA
-        set report to report & "HFS " & numA & " " & errA & ": " & outPath & linefeed
-      end try
-      if not okFlag then
-        try
-          save thePres in outPath as save as PDF
-          set report to report & "POSIX ok: " & outPath & linefeed
-        on error errB number numB
-          set report to report & "POSIX " & numB & " " & errB & ": " & outPath & linefeed
-        end try
-      end if
-    end repeat
-    close thePres saving no
   end tell
+  -- PowerPoint speichert das PDF im Hintergrund: erst warten, bis die Datei wirklich da ist, dann schließen
+  set report to ""
+  repeat with k from 3 to count of argv
+    set outPath to item k of argv
+    set saved to false
+    try
+      tell application "Microsoft PowerPoint" to save thePres in ((POSIX file outPath) as text) as save as PDF
+      set saved to true
+      set report to report & "HFS gespeichert: " & outPath & linefeed
+    on error errA number numA
+      set report to report & "HFS " & numA & " " & errA & ": " & outPath & linefeed
+    end try
+    if not saved then
+      try
+        tell application "Microsoft PowerPoint" to save thePres in outPath as save as PDF
+        set saved to true
+        set report to report & "POSIX gespeichert: " & outPath & linefeed
+      on error errB number numB
+        set report to report & "POSIX " & numB & " " & errB & ": " & outPath & linefeed
+      end try
+    end if
+    if saved then
+      set found to false
+      repeat 90 times
+        try
+          do shell script "test -s " & quoted form of outPath
+          set found to true
+          exit repeat
+        end try
+        delay 0.5
+      end repeat
+      if found then
+        set lastSize to -1
+        repeat 40 times
+          set curSize to (do shell script "stat -f %z " & quoted form of outPath) as integer
+          if curSize = lastSize then exit repeat
+          set lastSize to curSize
+          delay 0.5
+        end repeat
+        set report to report & "Datei da (" & lastSize & " Bytes): " & outPath & linefeed
+        exit repeat
+      else
+        set report to report & "Datei nach 45 s nicht da: " & outPath & linefeed
+      end if
+    end if
+  end repeat
+  tell application "Microsoft PowerPoint" to close thePres saving no
   return report
 end run`,
   'Microsoft Word': `on run argv

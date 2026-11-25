@@ -7,6 +7,7 @@ const http = require('http');
 const os = require('os');
 const fs = require('fs');
 const { execFile, spawn } = require('child_process');
+const { htmlSlidesToPdf } = require('./html-slides');
 
 let grandiose = null, ndiError = null;
 try { grandiose = require('@stagetimerio/grandiose'); } catch (e) { ndiError = e.message; }
@@ -403,17 +404,14 @@ async function macQuickLook(srcFile, outF) {
     const ql = fs.readdirSync(dir).find(n => n.endsWith('.qlpreview'));
     if (!ql) throw new Error('Quick Look hat keine Vorschau erzeugt');
     const qd = path.join(dir, ql);
+    try { logLine('  macOS-Vorschau Inhalt: ' + fs.readdirSync(qd).join(', ')); } catch (e) {}
     const pdf = path.join(qd, 'Preview.pdf');
     if (fs.existsSync(pdf)) { fs.copyFileSync(pdf, outF); return; }
     const html = fs.readdirSync(qd).find(n => /^Preview\.html?$/i.test(n));
     if (!html) throw new Error('Quick Look: weder PDF noch HTML in der Vorschau');
-    const w = new BrowserWindow({ show: false, width: 1280, height: 720, webPreferences: { offscreen: false, javascript: false } });
-    try {
-      await w.loadFile(path.join(qd, html));
-      await new Promise(r => setTimeout(r, 1500));
-      const data = await w.webContents.printToPDF({ landscape: true, printBackground: true, pageSize: { width: 13.333, height: 7.5 }, margins: { marginType: 'none' } });
-      fs.writeFileSync(outF, data);
-    } finally { w.destroy(); }
+    const n = await htmlSlidesToPdf(path.join(qd, html), outF);
+    logLine('  macOS-Vorschau: ' + n + ' Folien erkannt');
+    if (!n) throw new Error('macOS-Vorschau: keine einzelnen Folien erkannt');
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 }
 /* Protokoll für Fehler, damit nichts unbemerkt verschwindet */

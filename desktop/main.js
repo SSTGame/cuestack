@@ -385,10 +385,22 @@ async function macConvert(appName, srcFile, outF) {
       }
       if (!hit) await new Promise(r => setTimeout(r, 250));
     }
+    if (!hit) {
+      // PDF liegt evtl. in PowerPoints geschütztem Bereich: der Finder darf es herauskopieren
+      for (const f of targets) {
+        if (!fs.existsSync(f) || f.startsWith(dir)) continue;
+        try {
+          await run('osascript', ['-e', 'on run argv', '-e', 'tell application "Finder" to duplicate (POSIX file (item 1 of argv) as alias) to (POSIX file (item 2 of argv) as alias) with replacing', '-e', 'end run', f, dir], 30000);
+          const c = path.join(dir, path.basename(f));
+          const b = fs.readFileSync(c);
+          if (b.slice(0, 4).toString() === '%PDF') { fs.writeFileSync(outF, b); hit = f + ' (über Finder)'; fs.rm(c, { force: true }, () => {}); break; }
+        } catch (e) { logLine('  Finder-Kopie ' + f + ': ' + e.message); }
+      }
+    }
     for (const f of targets) {
       let st = 'fehlt';
       try { fs.accessSync(f, fs.constants.R_OK); st = 'lesbar'; } catch (e) { if (e.code !== 'ENOENT') st = e.code; }
-      logLine('  Ziel ' + f + ': ' + st + (f === hit ? ' ← benutzt' : ''));
+      logLine('  Ziel ' + f + ': ' + st + (hit && hit.startsWith(f) ? ' ← benutzt' : ''));
     }
     if (!hit) throw new Error('PDF wurde nicht erzeugt (alle Ablageorte geprüft, siehe Protokoll)');
   } finally {
@@ -419,6 +431,7 @@ function logLine(msg) {
   try { const d = app.getPath('logs'); fs.mkdirSync(d, { recursive: true }); fs.appendFileSync(path.join(d, 'cuestack.log'), new Date().toISOString() + '  ' + msg + '\n'); } catch (e) {}
 }
 ipcMain.handle('log-path', () => { try { return path.join(app.getPath('logs'), 'cuestack.log'); } catch (e) { return ''; } });
+ipcMain.handle('log-read', () => { try { const t = fs.readFileSync(path.join(app.getPath('logs'), 'cuestack.log'), 'utf8'); return t.slice(-12000); } catch (e) { return ''; } });
 ipcMain.handle('show-log', () => { try { const f = path.join(app.getPath('logs'), 'cuestack.log'); if (fs.existsSync(f)) shell.showItemInFolder(f); else shell.openPath(app.getPath('logs')); } catch (e) {} return true; });
 const macHas = (appName) => fs.existsSync(`/Applications/${appName}.app`);
 function run(cmd, args, timeout = 180000) {

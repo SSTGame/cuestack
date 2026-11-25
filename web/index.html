@@ -1300,7 +1300,10 @@ async function initNative(){const nb=$('#nativeBox');
   <p>Befehle (GET oder POST): <code>next</code>, <code>prev</code>, <code>slides/goto?n=3</code>, <code>slides/video</code>, <code>timer/toggle</code>, <code>timer/reset</code>, <code>timer/set?t=10:00</code>, <code>timer/add?sec=60</code>, <code>blackout/toggle</code>, <code>stage/message?text=Noch%205%20Minuten</code>, <code>lyrics/next</code>, <code>doc/next</code>. Status als JSON: <code>state</code>. Alle Befehle stehen im README.</p></details>`;
  $('#ndiFps').onchange=e=>{ndiFps=+e.target.value;};
  $('#addNdi').onclick=()=>openOutput(curView,null,'',{win:false,ndi:true});
- if(NATIVE.updateCheck)initUpdates(info);}
+ if(NATIVE.updateCheck)initUpdates(info);
+ if(NATIVE.readLog){const lg=document.createElement('details');lg.innerHTML='<summary>Protokoll</summary><div class="row"><button id="logRef">Aktualisieren</button><button id="logCopy">Kopieren</button></div><pre id="logTxt" style="white-space:pre-wrap;font-size:11px;max-height:340px;overflow:auto;background:#0006;padding:8px;border-radius:8px"></pre>';nb.appendChild(lg);
+  const ld=async()=>{const t=await NATIVE.readLog();$('#logTxt').textContent=t.split('\n').slice(-80).join('\n')||'(leer)';$('#logTxt').scrollTop=1e9;};
+  lg.addEventListener('toggle',()=>{if(lg.open)ld();});$('#logRef').onclick=ld;$('#logCopy').onclick=async()=>{try{await navigator.clipboard.writeText(await NATIVE.readLog());toast('Protokoll kopiert');}catch(e){}};}}
 /* ---------- Updates im Programm ---------- */
 function initUpdates(info){const nb=$('#nativeBox');const d=document.createElement('div');d.className='row';d.style.marginTop='10px';
  d.innerHTML=`<span class="hint" style="margin:0">CueStack ${info.version}</span><button id="updBtn">Nach Updates suchen</button><span id="updMsg" class="hint" style="margin:0"></span>`;nb.prepend(d);

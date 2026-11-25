@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('CueNative', {
   pptLive: (c) => ipcRenderer.invoke('ppt-live', c.buf ? { ...c, buf: new Uint8Array(c.buf) } : c),
   fxPrepare: (name, buf, height) => ipcRenderer.invoke('fx-prepare', { name, buf: new Uint8Array(buf), height }),
   onHint: (cb) => ipcRenderer.on('hint', (_e, m) => cb(m)),
+  readLog: () => ipcRenderer.invoke('log-read'),
   showLog: () => ipcRenderer.invoke('show-log'),
   updateCheck: () => ipcRenderer.invoke('update-check'),
   updateInstall: () => ipcRenderer.invoke('update-install'),

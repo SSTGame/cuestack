@@ -239,6 +239,7 @@ const MAC_EXPORT = {
       delay 0.5
     end repeat
     if p is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    activate
     try
       save p in outPath as save as PDF
     on error
@@ -262,6 +263,7 @@ end run`,
       delay 0.5
     end repeat
     if d is missing value then error "Word hat die Datei nicht geöffnet (Zeitüberschreitung)."
+    activate
     save as d file name outPath file format format PDF
     close d saving no
   end tell
@@ -286,28 +288,33 @@ for (const a of ['Keynote', 'Pages', 'Numbers']) MAC_EXPORT[a] = `on run argv
     close d saving no
   end tell
 end run`;
-function macAppDir(appName) {
-  const d = path.join(os.homedir(), 'Library', 'Containers', MAC_CONTAINER[appName], 'Data', 'Documents', 'CueStack');
-  try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); return d; }
-  catch (e) { throw new Error(`CueStack darf nicht in den Ordner von ${appName} schreiben (${e.code}). Bitte die macOS-Rückfrage „CueStack möchte auf Daten anderer Apps zugreifen“ erlauben – oder in Systemeinstellungen → Datenschutz & Sicherheit → App-Verwaltung CueStack einschalten.`); }
+/* Austauschordner gehört CueStack selbst – dorthin darf CueStack immer schreiben. PowerPoint fragt beim
+   ersten Mal einmal „Zugriff gewähren“ für diesen Ordner und merkt sich das danach. */
+function macExchangeDir() {
+  const d = path.join(app.getPath('userData'), 'Office-Austausch');
+  fs.mkdirSync(d, { recursive: true });
+  return d;
 }
 async function macConvert(appName, srcFile, outF) {
-  const dir = macAppDir(appName);
+  const dir = macExchangeDir();
   const docName = 'CueStack_' + Date.now() + path.extname(srcFile).toLowerCase();
   const docBase = docName.replace(/\.[^.]+$/, '');
-  const inF = path.join(path.dirname(srcFile), docName);
+  const inF = path.join(dir, docName);
   const outC = path.join(dir, docBase + '.pdf');
   fs.copyFileSync(srcFile, inF);
-  const as = path.join(os.tmpdir(), 'cuestack-export-' + appName.replace(/\W/g, '') + '.applescript');
+  const as = path.join(dir, 'export-' + appName.replace(/\W/g, '') + '.applescript');
   fs.writeFileSync(as, MAC_EXPORT[appName]);
+  if (win && !win.isDestroyed()) win.webContents.send('hint', `${appName.replace('Microsoft ', '')} wandelt um … Falls ${appName.replace('Microsoft ', '')} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
   try {
     await run('open', ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
-    await run('osascript', [as, docName, docBase, outC], 240000);
+    await run('osascript', [as, docName, docBase, outC], 300000);
     for (let i = 0; i < 40 && !fs.existsSync(outC); i++) await new Promise(r => setTimeout(r, 250));
-    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt');
-    try { fs.copyFileSync(outC, outF); }
-    catch (e) { throw new Error(`PDF erstellt, aber CueStack darf es nicht lesen (${e.code}). Bitte „Zugriff auf Daten anderer Apps“ für CueStack erlauben.`); }
-  } finally { for (const f of [inF, outC]) fs.rm(f, { force: true }, () => {}); }
+    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt – ggf. in PowerPoint „Zugriff gewähren“ bestätigen und erneut öffnen.');
+    fs.copyFileSync(outC, outF);
+  } finally {
+    for (const f of [inF, outC]) fs.rm(f, { force: true }, () => {});
+    setTimeout(() => { if (win && !win.isDestroyed()) win.focus(); }, 300);
+  }
 }
 /* Protokoll für Fehler, damit nichts unbemerkt verschwindet */
 function logLine(msg) {
@@ -606,7 +613,7 @@ ipcMain.handle('ppt-live', async (_e, c) => {
         appName = !isKey && macHas('Microsoft PowerPoint') ? 'Microsoft PowerPoint' : macHas('Keynote') ? 'Keynote' : null;
         if (!appName) return { ok: false, error: 'Weder Microsoft PowerPoint noch Keynote gefunden.' };
       } else if (process.platform !== 'win32') return { ok: false, error: 'PowerPoint live gibt es nur unter Windows und macOS.' };
-      const dir = path.join(os.tmpdir(), 'cuestack-live');
+      const dir = process.platform === 'darwin' ? macExchangeDir() : path.join(os.tmpdir(), 'cuestack-live');
       fs.mkdirSync(dir, { recursive: true });
       const file = path.join(dir, 'live_' + Date.now() + '_' + safe);
       fs.writeFileSync(file, Buffer.from(c.buf.buffer, c.buf.byteOffset, c.buf.byteLength));

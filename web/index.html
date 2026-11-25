@@ -511,11 +511,11 @@ async function pptxNotes(buf,all=false){const F=await unzip(buf,n=>/^ppt\/(prese
 async function readFiles(list,allowVid,opts={}){const arr=[...list].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const out=[];
  for(const f of arr){
   if(opts.fx&&/\.(pptx|ppsx|ppt|pps)$/i.test(f.name)&&NATIVE?.fxPrepare){const r=await fxFromPptx(f);if(r){out.push(r);continue;}}
-  if(isOffice(f)&&NATIVE?.convertOffice){toast('Wandle „'+f.name+'“ um … (dauert ein paar Sekunden)');
+  if(isOffice(f)&&NATIVE?.convertOffice){busy('Wandle „'+f.name+'“ um …');
    try{const ab=await f.arrayBuffer();let notes=null;if(/\.(pptx|ppsx)$/i.test(f.name)){try{notes=await pptxNotes(ab);}catch(e){}}
     const r=await NATIVE.convertOffice(f.name,ab);if(r.error)throw new Error(r.error);
-    out.push({name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',bytes:r.pdf,notes});toast('„'+f.name+'“ umgewandelt ('+r.via+')'+(notes&&notes.some(Boolean)?' – inkl. Sprechernotizen.':'.'));}
-   catch(e){toastErr('Umwandlung von „'+f.name+'“ fehlgeschlagen:\n'+e.message);}continue;}
+    busy(null);out.push({name:f.name.replace(/\.[^.]+$/,'')+'.pdf',type:'application/pdf',bytes:r.pdf,notes});toast('„'+f.name+'“ umgewandelt ('+r.via+')'+(notes&&notes.some(Boolean)?' – inkl. Sprechernotizen.':'.'));}
+   catch(e){busy(null);toastErr('Umwandlung von „'+f.name+'“ fehlgeschlagen:\n'+e.message);}continue;}
   if(isHeicF(f)){try{out.push(await normFile({name:f.name,type:f.type,bytes:await f.arrayBuffer()}));}catch(e){toast('HEIC-Umwandlung fehlgeschlagen: '+e.message);}continue;}
   if(!isPdf(f)&&!isImg(f)&&!(allowVid&&isVid(f))){toast(officeHint(f.name));continue;}out.push({name:f.name,type:f.type,bytes:await f.arrayBuffer()});}return out;}
 const isOffice=f=>/\.(pptx?|ppsx?|key|docx?|odt|odp|rtf|xlsx?|ods)$/i.test(f.name);
@@ -1287,6 +1287,7 @@ async function initNative(){const nb=$('#nativeBox');
  document.title='CueStack Desktop';
  NATIVE.onRemote((cmd,p)=>PV.remote(cmd,p));setInterval(()=>NATIVE.pushState(PV.state()),400);
  if(NATIVE.onPickSource)NATIVE.onPickSource(pickerModal);
+ if(NATIVE.onHint)NATIVE.onHint(m=>busy(m));
  const info=await NATIVE.info();PLAT=info.platform||'';$('#slFxBox').style.display='';
  if(PLAT==='darwin'){$('#slFx').checked=false;$('#slFx').disabled=true;$('#slFxHint').textContent='Effekte vorbereiten braucht PowerPoint für Windows – Microsoft erlaubt auf dem Mac keinen automatischen Videoexport. Unter Windows vorbereitete Shows (Show-Datei) laufen hier aber mit allen Effekten.';}
  const fill=async()=>{const ds=await NATIVE.displays();screens=ds.map(d=>({...d,isPrimary:d.primary,width:d.bounds.width,height:d.bounds.height}));fillScreens();};

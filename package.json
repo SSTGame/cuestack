@@ -1,7 +1,7 @@
 {
   "name": "cuestack",
   "productName": "CueStack",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Kostenloser Show-Cue-Helfer: Timer, Folien, PowerPoint, Dokumente, Lyrics, Referentenansicht, Stage-Monitor, Capture, Mix – Ausgabe als Fenster/Vollbild und NDI.",
   "main": "desktop/main.js",
   "author": "Sebastian Hellfritz",

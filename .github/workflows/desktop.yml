@@ -49,6 +49,18 @@ jobs:
             dist/*.zip
           if-no-files-found: error
 
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version lesen
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
         with:
@@ -56,6 +68,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: CueStack ${{ steps.v.outputs.version }}
           make_latest: true
+          fail_on_unmatched_files: true
           files: |
             dist/*.exe
             dist/*.dmg

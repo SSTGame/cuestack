@@ -32,7 +32,7 @@ async function htmlSlidesToPdf(htmlFile, outF, { target = 1920 } = {}) {
     if (!slides.length) return 0;
     const z = Math.max(0.5, Math.min(3, target / slides[0].w));
     w.webContents.setZoomFactor(z);
-    const W = Math.ceil(slides[0].w * z) + 4, H = Math.ceil(slides[0].h * z) + 4;
+    const W = Math.ceil(slides[0].w * z) + 8, H = Math.ceil(slides[0].h * z) + 8;
     w.setContentSize(W + 40, H + 40);
     await new Promise(r => setTimeout(r, 600));
     slides = await w.webContents.executeJavaScript(FIND);
@@ -41,7 +41,7 @@ async function htmlSlidesToPdf(htmlFile, outF, { target = 1920 } = {}) {
       const s = slides[i];
       await w.webContents.executeJavaScript(`window.scrollTo(${Math.max(0, s.x - 2)}, ${Math.max(0, s.y - 2)}); [window.scrollX, window.scrollY]`).then(async ([vx, vy]) => {
         await new Promise(r => setTimeout(r, 250));
-        const img = await w.webContents.capturePage({ x: Math.round(s.x - vx), y: Math.round(s.y - vy), width: Math.round(s.w), height: Math.round(s.h) });
+        const img = await w.webContents.capturePage({ x: Math.round((s.x - vx) * z), y: Math.round((s.y - vy) * z), width: Math.round(s.w * z), height: Math.round(s.h * z) });
         const f = path.join(tmp, 's' + i + '.png'); fs.writeFileSync(f, img.toPNG()); imgs.push(f);
       });
     }

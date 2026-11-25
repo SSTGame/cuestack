@@ -139,15 +139,15 @@ $ext = [IO.Path]::GetExtension($in).ToLower()
 if ($ext -match 'ppt|pps|odp') {
   $app = New-Object -ComObject PowerPoint.Application
   $p = $app.Presentations.Open($in, -1, 0, 0)
-  $p.SaveAs($out, 32); $p.Close(); $app.Quit()
+  $p.SaveAs($out, 32); $p.Close(); if ($app.Presentations.Count -eq 0) { $app.Quit() }
 } elseif ($ext -match 'doc|odt|rtf') {
   $app = New-Object -ComObject Word.Application; $app.Visible = $false
   $d = $app.Documents.Open($in, $false, $true)
-  $d.ExportAsFixedFormat($out, 17); $d.Close($false); $app.Quit()
+  $d.ExportAsFixedFormat($out, 17); $d.Close($false); if ($app.Documents.Count -eq 0) { $app.Quit() }
 } elseif ($ext -match 'xls|ods') {
   $app = New-Object -ComObject Excel.Application; $app.Visible = $false; $app.DisplayAlerts = $false
   $w = $app.Workbooks.Open($in, 0, $true)
-  $w.ExportAsFixedFormat(0, $out); $w.Close($false); $app.Quit()
+  $w.ExportAsFixedFormat(0, $out); $w.Close($false); if ($app.Workbooks.Count -eq 0) { $app.Quit() }
 } else { throw "Dateityp nicht unterstützt" }
 `;
 // AppleScripts: der App-Name muss fest im Skript stehen, sonst kennt osascript die Befehle der App nicht
@@ -246,6 +246,72 @@ function findSoffice() {
     : process.platform === 'darwin' ? ['/Applications/LibreOffice.app/Contents/MacOS/soffice'] : ['/usr/bin/soffice', '/usr/local/bin/soffice', '/snap/bin/libreoffice'];
   return c.find(p => fs.existsSync(p)) || null;
 }
+
+/* ---------- PowerPoint mit Effekten → Effekt-Video (Windows, unsichtbar im Hintergrund) ----------
+   In einer Kopie wird jede Klick-Animation zu „Nach vorheriger“ mit einer festen Pause (HOLD) und jede
+   Folie wechselt nach HOLD automatisch. PowerPoint rendert daraus ein Video mit allen Effekten; CueStack
+   findet die Pausen wieder und hält dort an – jeder Klick spielt bis zur nächsten Pause weiter. */
+const FX_HOLD = 1.5;
+const PS_FX = `
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$in = $args[0]; $out = $args[1]; $planFile = $args[2]; $hold = [double]$args[3]; $height = [int]$args[4]
+$app = New-Object -ComObject PowerPoint.Application
+$p = $app.Presentations.Open($in, 0, 0, 0)
+$plan = @()
+foreach ($s in $p.Slides) {
+  $t = $s.SlideShowTransition
+  if ($t.Hidden) { continue }
+  $steps = @()
+  $seq = $s.TimeLine.MainSequence
+  for ($i = 1; $i -le $seq.Count; $i++) {
+    $e = $seq.Item($i)
+    if ($e.Timing.TriggerType -eq 1) {
+      $d = [double]$e.Timing.TriggerDelayTime
+      $e.Timing.TriggerType = 3
+      $e.Timing.TriggerDelayTime = $hold + $d
+      $steps += $d
+    }
+  }
+  $endStop = $true
+  if ($t.AdvanceOnTime -and -not $t.AdvanceOnClick) { $endStop = $false }
+  else { $t.AdvanceOnClick = 0; $t.AdvanceOnTime = -1; $t.AdvanceTime = $hold }
+  $plan += @{ slide = $s.SlideIndex; steps = @($steps); endStop = $endStop }
+}
+$w = $p.PageSetup.SlideWidth; $h = $p.PageSetup.SlideHeight
+($(@{ hold = $hold; slides = $plan; w = $w; h = $h }) | ConvertTo-Json -Depth 5 -Compress) | Set-Content -Path $planFile -Encoding UTF8
+$p.CreateVideo($out, $true, 5, $height, 30, 90)
+$start = Get-Date
+while ($true) {
+  Start-Sleep -Milliseconds 700
+  $st = $p.CreateVideoStatus
+  if ($st -eq 3) { break }
+  if ($st -eq 4) { throw 'PowerPoint konnte das Video nicht erstellen.' }
+  if (((Get-Date) - $start).TotalMinutes -gt 60) { throw 'Zeitüberschreitung beim Videoexport.' }
+}
+$p.Saved = -1
+$p.Close()
+if ($app.Presentations.Count -eq 0) { $app.Quit() }
+`;
+ipcMain.handle('fx-prepare', async (_e, { name, buf, height }) => {
+  if (process.platform !== 'win32') return { error: 'mac' };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cuestack-fx-'));
+  const safe = String(name).replace(/[^\w.\- ]+/g, '_');
+  const inF = path.join(dir, safe), outF = path.join(dir, 'effekte.mp4'), planF = path.join(dir, 'plan.json');
+  fs.writeFileSync(inF, Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength));
+  const ps = path.join(dir, 'fx.ps1'); fs.writeFileSync(ps, '﻿' + PS_FX, 'utf8');
+  try {
+    await run('powershell.exe', ['-NoProfile', '-Sta', '-ExecutionPolicy', 'Bypass', '-File', ps, inF, outF, planF, String(FX_HOLD), String(height || 1080)], 65 * 60 * 1000);
+    if (!fs.existsSync(outF)) throw new Error('Kein Video erzeugt.');
+    const plan = JSON.parse(fs.readFileSync(planF, 'utf8').replace(/^﻿/, ''));
+    if (!Array.isArray(plan.slides)) plan.slides = plan.slides ? [plan.slides] : [];
+    plan.slides.forEach(s => { if (!Array.isArray(s.steps)) s.steps = s.steps == null ? [] : [s.steps]; });
+    return { video: fs.readFileSync(outF), plan };
+  } catch (e) {
+    return { error: /PowerPoint\.Application|80040154|ComObject/i.test(e.message) ? 'Microsoft PowerPoint wurde nicht gefunden.' : e.message };
+  } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
+});
+
 ipcMain.handle('convert-office', async (_e, { name, buf }) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cuestack-'));
   const safe = String(name).replace(/[^\w.\- ]+/g, '_');

@@ -93,6 +93,10 @@ details p,details li{color:var(--mu);font-size:12.5px}
 kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5px;font-size:12px}
 #toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,30px);opacity:0;background:#222733;border:1px solid var(--ln);padding:10px 16px;border-radius:10px;transition:.25s;z-index:9;max-width:90vw}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+#busy{position:fixed;left:16px;bottom:16px;z-index:9;display:none;gap:12px;align-items:center;background:#12392a;border:1px solid var(--ac2);padding:12px 16px;border-radius:12px;max-width:min(460px,90vw)}
+#busy.on{display:flex}#busy small{color:var(--mu)}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--ac);animation:sp 1s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
 #restore{display:none;background:#12392a;border-bottom:1px solid var(--ac2);padding:8px 14px;gap:10px;align-items:center}
 #restore.on{display:flex}
 #vids{position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;overflow:hidden;left:0;top:0}
@@ -219,6 +223,8 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
    <label>alle (s)<input type="number" id="slInt" min="1" value="8" style="width:80px"></label>
    <label class="ck"><input type="checkbox" id="slLoop" checked> Endlosschleife</label>
   </div>
+  <div class="box" id="slFxBox" style="display:none"><label class="ck" style="font-size:15px"><input type="checkbox" id="slFx" checked> <b>PowerPoint mit Effekten</b> – Animationen und Übergänge 1:1</label>
+   <p class="hint" id="slFxHint" style="margin:6px 0 0">Beim Öffnen einer .pptx erzeugt PowerPoint im Hintergrund ein Effekt-Video (dauert etwa so lange wie die Präsentation). Danach löst jeder Klick die nächste Animation aus – wie in PowerPoint, aber direkt in CueStack: Mix-Szenen, NDI, Referentenansicht. Die fertige Show läuft auch auf dem Mac.</p></div>
   <div class="box"><h3>Videoclips</h3>
    <div class="row" style="margin-top:0"><button id="slVidPlay">▶ / ❚❚ Video</button><button id="slVidRe">Von vorn</button>
     <label class="ck"><input type="checkbox" id="slAudio" checked> Ton abspielen</label>
@@ -377,6 +383,7 @@ kbd{background:#0b0d11;border:1px solid var(--ln);border-radius:4px;padding:0 5p
 </div>
 </div>
 <div id="toast" role="status"></div>
+<div id="busy" role="status"><span class="spin"></span><div><b id="busyT"></b><br><small id="busyS"></small></div></div>
 <div id="vids"></div>
 
 <script>
@@ -424,7 +431,8 @@ function officeHint(n){if(/\.(pptx?|ppsx?|key)$/i.test(n))return'PowerPoint dire
  if(/\.(docx?|xlsx?|odt|ods)$/i.test(n))return'Word/Excel bitte als PDF speichern (Datei → Exportieren → PDF), dann öffnen.';return'Dateityp nicht unterstützt: '+n;}
 class PageSet{
  constructor(items){this.items=items;this.n=items.length;this.cache=new Map();this.busy=new Set();this.onupdate=null;}
- get(i,tw){if(i<0||i>=this.n)return null;const it=this.items[i];if(it.img)return it.img;if(it.video)return it.video.readyState>=2?it.video:null;
+ get(i,tw){if(i<0||i>=this.n)return null;const it=this.items[i];if(it.img)return it.img;
+  if(it.fxv){if(i===this.cur&&it.fxv.readyState>=2)return it.fxv;return this.fxStill(i);}if(it.video)return it.video.readyState>=2?it.video:null;
   const want=Math.max(64,Math.min(4096,Math.round(tw)));const c=this.cache.get(i);
   if(c&&c.width>=want*.9){this.cache.delete(i);this.cache.set(i,c);return c;}
   if(!this.busy.has(i))this.render(i,want);return c||null;}
@@ -433,17 +441,33 @@ class PageSet{
    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp,background:'#ffffff'}).promise;
    this.cache.set(i,cv);while(this.cache.size>16)this.cache.delete(this.cache.keys().next().value);this.onupdate&&this.onupdate(i);
   }catch(e){console.error(e);}finally{this.busy.delete(i);}}
+ fxStill(i){const c=this.stills&&this.stills.get(i);if(c)return c;this.fxQueue(i);return null;}
+ fxQueue(i){this.stills=this.stills||new Map();this.q=this.q||new Set();if(this.q.has(i))return this.chain;this.q.add(i);
+  this.chain=(this.chain||Promise.resolve()).then(async()=>{if(this.stills.has(i)||this.gone)return;const it=this.items[i];
+   if(!this.fxs){const v=document.createElement('video');v.muted=true;v.preload='auto';v.src=it.url;$('#vids').appendChild(v);await new Promise(r=>{v.onloadeddata=r;v.onerror=r;});this.fxs=v;}
+   const v=this.fxs;await new Promise(r=>{const t=setTimeout(r,4000);v.onseeked=()=>{clearTimeout(t);r();};v.currentTime=it.at;});
+   const c=mk(960,Math.round(960*it.h/it.w));try{c.getContext('2d').drawImage(v,0,0,c.width,c.height);}catch(e){}this.stills.set(i,c);this.onupdate&&this.onupdate(i);});
+  return this.chain;}
  async thumb(i,cv){const it=this.items[i];const x=cv.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,cv.width,cv.height);let src=it.img;
+  if(it.fxv){await this.fxQueue(i);const st=this.stills.get(i);if(st){const[a,b,w,h]=fitRect(it.w,it.h,cv.width,cv.height,'contain');x.drawImage(st,a,b,w,h);}return;}
   if(it.video){const v=document.createElement('video');v.muted=true;v.preload='auto';v.src=it.url;
    await new Promise(r=>{v.onloadeddata=()=>{v.currentTime=Math.min(1,(v.duration||2)/2);};v.onseeked=r;v.onerror=r;setTimeout(r,4000);});src=v;}
   else if(!src){const pg=await it.pdf.getPage(it.no);const v0=pg.getViewport({scale:1});const vp=pg.getViewport({scale:cv.width/v0.width});src=mk(Math.round(vp.width),Math.round(vp.height));
    await pg.render({canvasContext:src.getContext('2d'),viewport:vp,background:'#ffffff'}).promise;}
   const[a,b,w,h]=fitRect(it.w,it.h,cv.width,cv.height,'contain');try{x.drawImage(src,a,b,w,h);}catch(e){}
   if(it.video){x.fillStyle='rgba(0,0,0,.6)';x.fillRect(cv.width-46,6,40,24);x.fillStyle='#fff';x.font='bold 15px system-ui';x.textAlign='center';x.fillText('▶',cv.width-26,24);}}
- dispose(){for(const it of this.items){if(it.video){it.video.pause();it.video.removeAttribute('src');it.video.load();it.video.remove();}if(it.url)URL.revokeObjectURL(it.url);}}
+ dispose(){this.gone=true;if(this.fxs){this.fxs.removeAttribute('src');this.fxs.remove();}
+  for(const it of this.items){if(it.fxv){it.fxv.pause();it.fxv.remove();}if(it.video){it.video.pause();it.video.removeAttribute('src');it.video.load();it.video.remove();}if(it.url)URL.revokeObjectURL(it.url);}}
 }
 async function buildPageSet(files){const items=[];
  for(const f of files){const nt=i=>(f.notes&&f.notes[i])||'';
+  if(f.fx){const url=URL.createObjectURL(new Blob([f.bytes],{type:'video/mp4'}));const v=document.createElement('video');v.preload='auto';v.playsInline=true;v.src=url;$('#vids').appendChild(v);
+   const ok=await new Promise(r=>{v.onloadeddata=()=>r(true);v.onerror=()=>r(false);});if(!ok){toast('Effekt-Video kann nicht abgespielt werden: '+f.name);v.remove();continue;}
+   const per={},tot={};f.fx.stops.forEach(s=>{if(s.kind==='step')tot[s.slide]=(tot[s.slide]||0)+1;});
+   for(const s of f.fx.stops){const k=s.kind==='step'?(per[s.slide]=(per[s.slide]||0)+1):0;
+    items.push({fxv:v,url,at:s.at,res:s.res,w:v.videoWidth,h:v.videoHeight,slide:s.slide,
+     label:`Folie ${s.slide}`+(s.kind==='step'?` · vor Animation ${k}/${tot[s.slide]}`:''),note:(f.fxNotes&&f.fxNotes[s.slide-1])||''});}
+   continue;}
   if(isPdf(f)){const lib=await loadPdfLib();const pdf=await lib.getDocument({data:new Uint8Array(f.bytes.slice(0))}).promise;
    for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p);const v=pg.getViewport({scale:1});items.push({pdf,no:p,w:v.width,h:v.height,note:nt(p-1)});}}
   else if(isImg(f)){const img=await createImageBitmap(new Blob([f.bytes],{type:f.type||'image/png'}));items.push({img,w:img.width,h:img.height,note:nt(0)});}
@@ -474,8 +498,9 @@ async function pptxNotes(buf,all=false){const F=await unzip(buf,n=>/^ppt\/(prese
      for(const pa of sp.getElementsByTagNameNS('*','p'))out.push([...pa.getElementsByTagNameNS('*','t')].map(t=>t.textContent).join(''));}
     txt=out.join('\n').replace(/\n{3,}/g,'\n\n').trim();}}
   res.push(txt);}return res;}
-async function readFiles(list,allowVid){const arr=[...list].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const out=[];
+async function readFiles(list,allowVid,opts={}){const arr=[...list].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const out=[];
  for(const f of arr){
+  if(opts.fx&&/\.(pptx|ppsx|ppt|pps)$/i.test(f.name)&&NATIVE?.fxPrepare){const r=await fxFromPptx(f);if(r){out.push(r);continue;}}
   if(isOffice(f)&&NATIVE?.convertOffice){toast('Wandle „'+f.name+'“ um … (dauert ein paar Sekunden)');
    try{const ab=await f.arrayBuffer();let notes=null;if(/\.(pptx|ppsx)$/i.test(f.name)){try{notes=await pptxNotes(ab);}catch(e){}}
     const r=await NATIVE.convertOffice(f.name,ab);if(r.error)throw new Error(r.error);
@@ -538,6 +563,64 @@ async function setDocFiles(files,page=0,st=D){const D=st;if(!files.length)return
   idb.set(docKey(D),files);saveSoon();
  }catch(e){toast(e.message);}if(D===window.PV.uiD())updDocUI();}
 
+/* ---------- PowerPoint mit Effekten: Effekt-Video + Klick-Stopps ---------- */
+let PLAT='';
+function busy(t,sub){const b=$('#busy');if(!t){b.classList.remove('on');clearInterval(busy.h);return;}b.classList.add('on');$('#busyT').textContent=t;
+ const t0=Date.now();clearInterval(busy.h);const upd=()=>{const e=Math.floor((Date.now()-t0)/1000);$('#busyS').textContent=(sub?sub+' · ':'')+fmt(e);};upd();busy.h=setInterval(upd,1000);}
+/* Findet im Effekt-Video die eingebauten Pausen (= Klick-Stellen) und ordnet sie dem Plan zu */
+async function fxAnalyze(bytes,plan,prog=()=>{}){
+ const url=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}));const v=document.createElement('video');v.muted=true;v.preload='auto';v.src=url;$('#vids').appendChild(v);
+ try{
+  await new Promise((r,j)=>{v.onloadeddata=r;v.onerror=()=>j(new Error('Effekt-Video nicht lesbar'));});
+  const dur=v.duration,cw=160,ch=90,cv=mk(cw,ch),cx=cv.getContext('2d',{willReadFrequently:true});
+  const sig=()=>{cx.drawImage(v,0,0,cw,ch);const d=cx.getImageData(0,0,cw,ch).data,g=new Uint8Array(cw*ch);for(let i=0,j=0;i<d.length;i+=4,j++)g[j]=(d[i]*3+d[i+1]*6+d[i+2])/10;return g;};
+  /* Anzahl deutlich veränderter Pixel – erkennt auch langsames Einblenden kleiner Objekte */
+  const diff=(a,b)=>{let n=0;for(let i=0;i<a.length;i++)if(Math.abs(a[i]-b[i])>5)n++;return n;};
+  const TH=3;
+  /* 1) schnell durchspielen und Bilder vergleichen */
+  const smp=[];v.playbackRate=4;
+  await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res();}};
+   const step=(now,md)=>{smp.push({t:md.mediaTime,g:sig()});prog(md.mediaTime/dur);if(v.ended)return fin();v.requestVideoFrameCallback(step);};
+   v.onended=()=>setTimeout(fin,80);v.requestVideoFrameCallback(step);v.play().catch(fin);});
+  v.pause();v.playbackRate=1;
+  const seek=t=>new Promise(r=>{const to=setTimeout(r,3000);v.onseeked=()=>{clearTimeout(to);r();};v.currentTime=Math.min(dur,Math.max(0,t));});
+  if(!smp.length||smp[smp.length-1].t<dur-.05){await seek(dur-.001);smp.push({t:dur,g:sig()});}
+  const runs=[];let a=0;
+  for(let i=1;i<=smp.length;i++){if(i<smp.length&&diff(smp[i].g,smp[i-1].g)<TH)continue;
+   const b=i-1;const len=smp[b].t-smp[a].t;
+   if(len>=plan.hold*.4){const g1=smp[b+1]?smp[b+1].t-smp[b].t:0,g0=a>0?smp[a].t-smp[a-1].t:0;runs.push({a,b,len,gap:(g0+g1)/2});}a=i;}
+  /* 2) erwartete Stopps aus dem Plan */
+  const exp=[];for(const sl of plan.slides){for(const d of sl.steps||[])exp.push({slide:sl.slide,kind:'step',len:plan.hold+(+d||0)});if(sl.endStop)exp.push({slide:sl.slide,kind:'end',len:plan.hold});}
+  /* 3) Zuordnung (DP): Reihenfolge bleibt, unpassende Pausen werden übersprungen */
+  const N=exp.length,M=runs.length;let pick=[];
+  if(N&&M>=N){const INF=1e9,dp=Array.from({length:N+1},()=>new Float64Array(M+1).fill(INF));dp[0].fill(0);
+   for(let i=1;i<=N;i++)for(let j=i;j<=M;j++){const c=Math.abs(runs[j-1].len+runs[j-1].gap-exp[i-1].len);dp[i][j]=Math.min(dp[i][j-1],dp[i-1][j-1]+c);}
+   let i=N,j=M;while(i>0){if(j>i&&dp[i][j]===dp[i][j-1])j--;else{pick.unshift({e:exp[i-1],r:runs[j-1]});i--;j--;}}}
+  else pick=runs.map((r,k)=>({e:exp[k]||{slide:exp.length?exp[exp.length-1].slide:k+1,kind:'end'},r}));
+  /* 4) Ende jeder Pause genau suchen, damit der Klick sofort losläuft */
+  const stops=[];let k=0;
+  for(const{e,r}of pick){prog(1,++k/pick.length);const at=smp[r.a].t+.02,ref=smp[r.b].g;let lo=smp[r.b].t,hi=smp[r.b+1]?smp[r.b+1].t:dur;
+   if(!smp[r.b+1]){stops.push({at,res:dur,slide:e.slide,kind:e.kind});continue;}
+   for(let it=0;it<7&&hi-lo>1/60;it++){const mid=(lo+hi)/2;await seek(mid);if(diff(sig(),ref)<TH)lo=mid;else hi=mid;}
+   stops.push({at,res:lo,slide:e.slide,kind:e.kind});}
+  return{stops,hold:plan.hold,expected:N,found:pick.length,runs:runs.map(r=>[+smp[r.a].t.toFixed(2),+smp[r.b].t.toFixed(2)]),samples:smp.length,maxGap:+Math.max(...smp.slice(1).map((x,i)=>x.t-smp[i].t)).toFixed(3)};
+ }finally{v.removeAttribute('src');v.load();v.remove();URL.revokeObjectURL(url);}}
+async function fxFromPptx(f){
+ if(PLAT==='darwin'){toast('Effekte vorbereiten geht nur mit PowerPoint für Windows – Microsoft erlaubt auf dem Mac keinen automatischen Videoexport. Die .pptx wird als Standbild-Folien geladen; eine unter Windows vorbereitete Show läuft hier mit allen Effekten.');return null;}
+ const ab=await f.arrayBuffer();let notes=[];try{notes=await pptxNotes(ab,true);}catch(e){}
+ busy('PowerPoint bereitet die Effekte vor …','dauert etwa so lange wie die Präsentation');
+ try{const r=await NATIVE.fxPrepare(f.name,ab,resKey==='2160'?2160:1080);
+  if(r.error){toast('Effekte vorbereiten fehlgeschlagen: '+r.error+' – lade als Standbild-Folien.');return null;}
+  busy('Suche Klick-Stellen …');const fx=await fxAnalyze(r.video,r.plan,(p,q)=>{$('#busyT').textContent=q!=null?`Feinabstimmung ${Math.round(q*100)} %`:`Suche Klick-Stellen ${Math.round(p*100)} %`;});
+  if(fx.found<fx.expected)toast(`Hinweis: ${fx.found} von ${fx.expected} Klick-Stellen erkannt.`);
+  return{name:f.name.replace(/\.[^.]+$/,'')+' (Effekte).mp4',type:'video/mp4',bytes:r.video,fx,fxNotes:notes};
+ }finally{busy(null);}}
+const fxOf=S=>S&&S.ps&&S.ps.items[0]&&S.ps.items[0].fxv?S.ps:null;
+function fxGo(S,from,i){const ps=S.ps,v=ps.items[0].fxv;ps.cur=i;v.muted=!S.audio;v.onseeked=()=>{byId[S.id].dirty=true;};
+ if(i===from+1&&from>=0){try{v.currentTime=ps.items[from].res;}catch(e){}S.fxT=ps.items[i].at;v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});});}
+ else{v.pause();S.fxT=null;try{v.currentTime=ps.items[i].at;}catch(e){}}}
+PV.fxTest=async(bytes,plan,name='Test.pptx',notes=[])=>{const fx=await fxAnalyze(bytes,plan);await setSlideFiles([{name:name.replace(/\.[^.]+$/,'')+' (Effekte).mp4',type:'video/mp4',bytes,fx,fxNotes:notes}]);return fx;};
+
 /* ---------- FOLIEN: SL[0..3]. S = im Panel angezeigt, FS = zuletzt benutzt (Referent, Stage, Clicker) ---------- */
 const SL=[1,2,3,4].map(n=>({n,id:n===1?'slides':'slides'+n,files:[],ps:null,idx:0,prev:-1,dir:1,t0:0,trans:'fade',dur:.6,auto:false,interval:8,loop:true,fit:'contain',lastAuto:0,audio:true,vidNext:false,vidLoop:false,notes:[],shownAt:0}));
 let S=SL[0],FS=SL[0];
@@ -549,12 +632,13 @@ function startVideo(i,st=S){const S=st;const it=S.ps?.items[i];if(!it?.video)ret
  v.onended=()=>{if(S.ps?.items[S.idx]===it&&S.vidNext)slideGo(S.idx+1,S);};v.play().catch(()=>{v.muted=true;v.play().catch(()=>{});toast('Video läuft stumm – Browser blockiert Ton ohne Klick.');});}
 function slideGo(i,st=S){const S=st;FS=S;if(!S.ps||!S.ps.n)return;const n=S.ps.n;let dir=i>S.idx?1:-1;
  if(i>=n){if(!S.loop)return;i=0;dir=1;}if(i<0){if(!S.loop)return;i=n-1;dir=-1;}if(i===S.idx)return;
+ if(fxOf(S)){const from=S.idx;S.prev=-1;S.idx=i;fxGo(S,from,i);S.lastAuto=Date.now();byId[S.id].dirty=true;updSlideUI();saveSoon();return;}
  const old=S.ps.items[S.idx];if(old?.video){setTimeout(()=>{if(S.ps?.items[S.idx]!==old)old.video.pause();},S.dur*1000+50);}
  S.prev=S.idx;S.dir=dir;S.idx=i;S.t0=performance.now();S.lastAuto=Date.now();startVideo(i,S);byId[S.id].dirty=true;updSlideUI();saveSoon();}
 function drawPage(c,S,i,a,dx=0,dy=0,sc=1){const it=S.ps.items[i];if(!it||a<=0)return;const[x,y,w,h]=fitRect(it.w,it.h,W,H,S.fit);const img=S.ps.get(i,w);if(!img)return;
  c.save();c.globalAlpha=a;if(sc!==1){c.translate(W/2,H/2);c.scale(sc,sc);c.translate(-W/2,-H/2);}c.drawImage(img,x+dx,y+dy,w,h);c.restore();}
 for(const st of SL)addSource({id:st.id,type:'slides',name:'Folien '+st.n,st,draw(now){const S=this.st;
- const cv=curVideo(S),p=(S.prev<0||S.trans==='cut')?1:Math.min(1,(now-S.t0)/(S.dur*1000)),an=p<1||!!(cv&&!cv.paused);
+ const cv=curVideo(S),fv=fxOf(S)&&S.ps.items[0].fxv,p=(S.prev<0||S.trans==='cut')?1:Math.min(1,(now-S.t0)/(S.dur*1000)),an=p<1||!!(cv&&!cv.paused)||!!(fv&&!fv.paused);
  if(!an&&!this.dirty&&!this.was)return;this.was=an;this.dirty=false;const c=this.ctx;c.clearRect(0,0,W,H);if(!S.ps||!S.ps.n)return;
  S.ps.get(S.idx+1,W);const e=ease(p),P=S.prev,I=S.idx,d=S.dir;
  if(p>=1){drawPage(c,S,I,1);return;}
@@ -572,6 +656,7 @@ for(const st of SL)addSource({id:st.id,type:'slides',name:'Folien '+st.n,st,draw
 async function setSlideFiles(files,idx=0,notes=null,st=S){const S=st;if(!files.length)return;if(S===PV.uiS())$('#slEmpty').textContent='Lade…';
  try{const ps=await buildPageSet(files);if(S.ps)S.ps.dispose();S.files=files;S.ps=ps;S.idx=Math.min(idx,ps.n-1);S.prev=-1;
   S.notes=Array.isArray(notes)&&notes.length?notes.slice(0,ps.n):ps.items.map(it=>it.note||'');ps.onupdate=i=>{byId[S.id].dirty=true;if(S===PV.uiS()&&i===S.idx+1)drawNext();};
+  startVideo(S.idx,S);if(fxOf(S))fxGo(S,-1,S.idx);
   idb.set(slideKey(S),files);saveSoon();
  }catch(e){toast(e.message);}
  if(S===PV.uiS()){updSlidePanel();}}
@@ -583,9 +668,9 @@ async function buildThumbs(){const box=$('#thumbs');box.innerHTML='';if(!S.ps){u
 function drawNext(){const cv=$('#nextPv'),x=cv.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,cv.width,cv.height);if(!S.ps)return;
  let n=S.idx+1;if(n>=S.ps.n){if(!S.loop){x.fillStyle='#8d95a8';x.font='16px system-ui';x.textAlign='center';x.fillText('Ende',cv.width/2,cv.height/2);return;}n=0;}
  const it=S.ps.items[n],img=S.ps.get(n,W);if(!img)return;const[a,b,w,h]=fitRect(it.w,it.h,cv.width,cv.height,'contain');x.drawImage(img,a,b,w,h);}
-function updSlideUI(){$('#slInfo').textContent=S.ps?`Folie ${S.idx+1} / ${S.ps.n}`:'–';
+function updSlideUI(){const lab=(D2)=>D2.ps?(D2.ps.items[D2.idx]?.label?`${D2.ps.items[D2.idx].label} · Schritt ${D2.idx+1}/${D2.ps.n}`:`Folie ${D2.idx+1} / ${D2.ps.n}`):'–';$('#slInfo').textContent=lab(S);
  const F=FS,na=$('#prNotes');if(na&&document.activeElement!==na)na.value=F.ps?(F.notes[F.idx]||''):'';
- $('#prInfo').textContent=F.ps?`Folien ${F.n} · Folie ${F.idx+1} / ${F.ps.n}`:'Keine Folien geladen';byId.presenter&&(byId.presenter.dirty=true);
+ $('#prInfo').textContent=F.ps?`Folien ${F.n} · `+lab(F):'Keine Folien geladen';byId.presenter&&(byId.presenter.dirty=true);
  $$('#thumbs .th').forEach(b=>b.classList.toggle('cur',+b.dataset.i===S.idx));const cur=$('#thumbs .th.cur');if(cur)cur.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});drawNext();}
 
 /* ---------- LYRICS ---------- */
@@ -800,7 +885,7 @@ addSource({id:'presenter',type:'presenter',name:'Referentenansicht',last:0,draw(
  const S=FS,c=this.ctx,u=H/100,A='Arial, Helvetica, sans-serif',B=s=>`700 ${s}px ${A}`;c.fillStyle='#0b0c10';c.fillRect(0,0,W,H);c.textBaseline='middle';
  const d=new Date();c.font=B(6*u);c.fillStyle='#c9cfdb';c.textAlign='left';c.fillText(p2(d.getHours())+':'+p2(d.getMinutes()),3*u,6.5*u);
  if(PR.started){const el=Math.floor((Date.now()-PR.started)/1000);c.font=`400 ${3.6*u}px ${A}`;c.fillStyle='#8d95a8';c.fillText('Laufzeit '+fmt(el),24*u,6.5*u);}
- if(S.ps){c.textAlign='center';c.font=`600 ${4*u}px ${A}`;c.fillStyle='#c9cfdb';c.fillText(`Folie ${S.idx+1} / ${S.ps.n}`,W/2,6.5*u);}
+ if(S.ps){c.textAlign='center';c.font=`600 ${4*u}px ${A}`;c.fillStyle='#c9cfdb';c.fillText(S.ps.items[S.idx]?.label?`${S.ps.items[S.idx].label} · ${S.idx+1}/${S.ps.n}`:`Folie ${S.idx+1} / ${S.ps.n}`,W/2,6.5*u);}
  if(T.mode!=='clock'){const ts=tState();c.textAlign='right';c.fillStyle=ts.col;c.font=B(fitFont(c,ts.txt,W*.3,9*u,B));c.fillText(ts.txt,W-3*u,6.5*u);}
  const top=14*u,cw=W*.6,ch=cw*9/16,cx=2.5*u;
  boxImg(c,S.ps?byId[S.id].canvas:null,W,H,cx,top,cw,Math.min(ch,H-top-3*u));
@@ -899,6 +984,7 @@ function deps(s){return s?.type==='mix'?[...s.live,...(s.prev>=0?(s.scenes[s.pre
 function needed(){const n=new Set();const add=id=>{if(n.has(id))return;n.add(id);deps(byId[id]).forEach(add);};
  outputs.forEach(o=>add(o.src));add(curView);return n;}
 function logic(now){
+ for(const S of SL)if(S.fxT!=null&&fxOf(S)){const v=S.ps.items[0].fxv;if(v.currentTime>=S.fxT||v.ended){v.pause();try{v.currentTime=S.fxT;}catch(e){}S.fxT=null;byId[S.id].dirty=true;}}
  for(const S of SL)if(S.auto&&S.ps&&Date.now()-S.lastAuto>S.interval*1000){if(S.idx<S.ps.n-1||S.loop)slideGo(S.idx+1,S);else S.lastAuto=Date.now();}
  if(LY.synced&&LY.playing){const p=lyPos();let i=-1;for(let k=0;k<LY.lines.length;k++){if(LY.lines[k].t<=p)i=k;else break;}
   const l=LY.lines[i],sb=!!(l&&l.e!=null&&p>l.e);if(i!==LY.idx||sb!==LY.sb){LY.idx=i;LY.sb=sb;LY.chg=now;byId.lyrics.dirty=true;updLyUI();}}}
@@ -964,14 +1050,14 @@ async function applySnap(j,getFiles){
  sources.forEach(s=>s.dirty=true);updSlideUI();return j.outs||[];}
 const toB64=buf=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]);fr.readAsDataURL(new Blob([buf]));});
 function fromB64(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;}
-async function exportShow(){const j=snapshot();const enc=async fs=>Promise.all(fs.map(async f=>({name:f.name,type:f.type,notes:f.notes||null,b64:await toB64(f.bytes)})));
+async function exportShow(){const j=snapshot();const enc=async fs=>Promise.all(fs.map(async f=>({name:f.name,type:f.type,notes:f.notes||null,fx:f.fx||null,fxNotes:f.fxNotes||null,b64:await toB64(f.bytes)})));
  j.files={media:await Promise.all(MED.map(async m=>m.file?(await enc([m.file]))[0]:null))};
  for(const d of DL)j.files[d.id]=await enc(d.files);for(const x of SL)j.files[x.id]=await enc(x.files);
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(j)],{type:'application/json'}));
  const d=new Date();a.download=`Show_${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}.cuestack`;
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Show gespeichert.');}
 async function importShow(file){try{const j=JSON.parse(await file.text());if(j.app!=='CueStack')throw new Error('Keine CueStack-Showdatei.');
- const dec=fs=>(fs||[]).map(f=>({name:f.name,type:f.type,notes:f.notes||null,bytes:fromB64(f.b64)}));
+ const dec=fs=>(fs||[]).map(f=>({name:f.name,type:f.type,notes:f.notes||null,fx:f.fx||null,fxNotes:f.fxNotes||null,bytes:fromB64(f.b64)}));
  for(const d of DL){d.files=[];d.ps=null;d.L=[];d.total=0;byId[d.id].dirty=true;idb.set(docKey(d),[]);}
  for(const x of SL){if(x.ps)x.ps.dispose();x.files=[];x.ps=null;x.notes=[];x.idx=0;byId[x.id].dirty=true;idb.set(slideKey(x),[]);}$('#thumbs').innerHTML='';
  const byKey={};for(const d of DL)byKey[docKey(d)]=dec(j.files?.[d.id]);for(const x of SL)byKey[slideKey(x)]=dec(j.files?.[x.id]);
@@ -1043,7 +1129,7 @@ $('#docSpeed').oninput=e=>{D.speed=+e.target.value;FD=D;};
 $('#pv-doc').addEventListener('wheel',e=>{if(!D.ps)return;e.preventDefault();D.target+=e.deltaY*H/$('#pv-doc').clientHeight;byId[D.id].dirty=true;},{passive:false});
 /* Folien */
 $('#slOpen').onclick=()=>$('#slFile').click();
-$('#slFile').onchange=async e=>{setSlideFiles(await readFiles(e.target.files,true));e.target.value='';};
+$('#slFile').onchange=async e=>{const fl=[...e.target.files];e.target.value='';setSlideFiles(await readFiles(fl,true,{fx:$('#slFx').checked}));};
 $('#slAudio').onchange=e=>{S.audio=e.target.checked;const v=curVideo();if(v)v.muted=!S.audio;saveSoon();};
 $('#slVidNext').onchange=e=>{S.vidNext=e.target.checked;saveSoon();};
 $('#slVidLoop').onchange=e=>{S.vidLoop=e.target.checked;const v=curVideo();if(v)v.loop=S.vidLoop;saveSoon();};
@@ -1057,7 +1143,7 @@ $('#slAuto').onchange=e=>{S.auto=e.target.checked;S.lastAuto=Date.now();saveSoon
 $('#slLoop').onchange=e=>{S.loop=e.target.checked;drawNext();saveSoon();};
 /* Drag & Drop */
 for(const z of $$('.drop')){z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag');});z.addEventListener('dragleave',()=>z.classList.remove('drag'));
- z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const f=z.dataset.for==='med'?await Promise.all([...e.dataTransfer.files].slice(0,1).map(async x=>({name:x.name,type:x.type,bytes:await x.arrayBuffer()}))):await readFiles(e.dataTransfer.files,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else if(z.dataset.for==='med'){const s=byId[curView];if(s?.type==='med')medLoad(s,f[0]);}else setSlideFiles(f);});}
+ z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('drag');const f=z.dataset.for==='slides'?await readFiles(e.dataTransfer.files,true,{fx:$('#slFx').checked}):z.dataset.for==='med'?await Promise.all([...e.dataTransfer.files].slice(0,1).map(async x=>({name:x.name,type:x.type,bytes:await x.arrayBuffer()}))):await readFiles(e.dataTransfer.files,z.dataset.for==='slides');if(z.dataset.for==='doc')setDocFiles(f);else if(z.dataset.for==='med'){const s=byId[curView];if(s?.type==='med')medLoad(s,f[0]);}else setSlideFiles(f);});}
 /* Lyrics */
 $('#lySty').innerHTML=LSTY.map((s,i)=>`<option value="${i}">${i+1}. ${s.n}</option>`).join('');
 $('#lySty').onchange=e=>{LY.style=+e.target.value;byId.lyrics.dirty=true;saveSoon();};
@@ -1191,7 +1277,8 @@ async function initNative(){const nb=$('#nativeBox');
  document.title='CueStack Desktop';
  NATIVE.onRemote((cmd,p)=>PV.remote(cmd,p));setInterval(()=>NATIVE.pushState(PV.state()),400);
  if(NATIVE.onPickSource)NATIVE.onPickSource(pickerModal);
- const info=await NATIVE.info();
+ const info=await NATIVE.info();PLAT=info.platform||'';$('#slFxBox').style.display='';
+ if(PLAT==='darwin'){$('#slFx').checked=false;$('#slFx').disabled=true;$('#slFxHint').textContent='Effekte vorbereiten braucht PowerPoint für Windows – Microsoft erlaubt auf dem Mac keinen automatischen Videoexport. Unter Windows vorbereitete Shows (Show-Datei) laufen hier aber mit allen Effekten.';}
  const fill=async()=>{const ds=await NATIVE.displays();screens=ds.map(d=>({...d,isPrimary:d.primary,width:d.bounds.width,height:d.bounds.height}));fillScreens();};
  await fill();NATIVE.onDisplaysChanged&&NATIVE.onDisplaysChanged(fill);$('#scrDetect').textContent='Neu laden';$('#scrDetect').onclick=fill;
  nb.innerHTML=`<div class="row" style="margin-top:0"><button id="addNdi" class="pri">+ NDI-Ausgang</button>

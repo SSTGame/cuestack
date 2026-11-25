@@ -1,7 +1,7 @@
 {
   "name": "cuestack",
   "productName": "CueStack",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "description": "Kostenloser Show-Cue-Helfer: Timer, Folien, PowerPoint, Dokumente, Lyrics, Referentenansicht, Stage-Monitor, Capture, Mix – Ausgabe als Fenster/Vollbild und NDI.",
   "main": "desktop/main.js",
   "author": "Sebastian Hellfritz",
@@ -57,10 +57,16 @@
           "arch": [
             "arm64"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.video",
-      "artifactName": "CueStack-${version}-Mac-AppleSilicon.dmg",
+      "artifactName": "CueStack-${version}-Mac-AppleSilicon.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
       "extendInfo": {

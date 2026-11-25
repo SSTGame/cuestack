@@ -22,5 +22,8 @@ contextBridge.exposeInMainWorld('CueNative', {
   fxPrepare: (name, buf, height) => ipcRenderer.invoke('fx-prepare', { name, buf: new Uint8Array(buf), height }),
   onHint: (cb) => ipcRenderer.on('hint', (_e, m) => cb(m)),
   showLog: () => ipcRenderer.invoke('show-log'),
+  updateCheck: () => ipcRenderer.invoke('update-check'),
+  updateInstall: () => ipcRenderer.invoke('update-install'),
+  onUpdateProgress: (cb) => ipcRenderer.on('update-progress', (_e, m) => cb(m)),
   convertOffice: (name, buf) => ipcRenderer.invoke('convert-office', { name, buf: new Uint8Array(buf) }),
 });

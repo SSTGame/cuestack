@@ -253,13 +253,29 @@ const MAC_EXPORT = {
     end if
     if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
-    try
-      save thePres in outPath as save as PDF
-    on error
-      save thePres in ((POSIX file outPath) as text) as save as PDF
-    end try
+    set report to ""
+    repeat with k from 3 to count of argv
+      set outPath to item k of argv
+      set okFlag to false
+      try
+        save thePres in ((POSIX file outPath) as text) as save as PDF
+        set okFlag to true
+        set report to report & "HFS ok: " & outPath & linefeed
+      on error errA number numA
+        set report to report & "HFS " & numA & " " & errA & ": " & outPath & linefeed
+      end try
+      if not okFlag then
+        try
+          save thePres in outPath as save as PDF
+          set report to report & "POSIX ok: " & outPath & linefeed
+        on error errB number numB
+          set report to report & "POSIX " & numB & " " & errB & ": " & outPath & linefeed
+        end try
+      end if
+    end repeat
     close thePres saving no
   end tell
+  return report
 end run`,
   'Microsoft Word': `on run argv
   set docName to item 1 of argv
@@ -334,26 +350,71 @@ function macExchangeDir() {
   fs.mkdirSync(d, { recursive: true });
   return d;
 }
+/* Mögliche Ablageorte, in die das sandboxed PowerPoint schreiben darf. Der erste lesbare gewinnt. */
+function macTargets(appName, base) {
+  const h = os.homedir(), t = [];
+  if (/^Microsoft/.test(appName)) {
+    t.push(path.join(h, 'Library/Group Containers/UBF8T346G9.Office', base + '.pdf'));
+    const c = MAC_CONTAINER[appName];
+    if (c) t.push(path.join(h, 'Library/Containers', c, 'Data/Library/Caches', base + '.pdf'));
+    t.push(path.join(h, 'Downloads', base + '.pdf'));
+  }
+  t.push(path.join(macExchangeDir(), base + '.pdf'));
+  return t;
+}
 async function macConvert(appName, srcFile, outF) {
   const dir = macExchangeDir();
   const docName = 'CueStack_' + Date.now() + path.extname(srcFile).toLowerCase();
   const docBase = docName.replace(/\.[^.]+$/, '');
   const inF = path.join(dir, docName);
-  const outC = path.join(dir, docBase + '.pdf');
   fs.copyFileSync(srcFile, inF);
+  const targets = /^Microsoft PowerPoint/.test(appName) ? macTargets(appName, docBase) : [path.join(dir, docBase + '.pdf')];
   const as = path.join(dir, 'export-' + appName.replace(/\W/g, '') + '.applescript');
   fs.writeFileSync(as, MAC_EXPORT[appName]);
-  if (win && !win.isDestroyed()) win.webContents.send('hint', `${appName.replace('Microsoft ', '')} wandelt um … Falls ${appName.replace('Microsoft ', '')} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
+  const short = appName.replace('Microsoft ', '');
+  if (win && !win.isDestroyed()) win.webContents.send('hint', `${short} wandelt um … Falls ${short} nach Zugriff fragt: „Zugriff gewähren“ klicken (nur beim ersten Mal).`);
   try {
     await run('open', ['-g', '-a', appName, inF], 60000);           // macOS übergibt die Datei an die App
-    await run('osascript', [as, docName, docBase, outC], 300000);
-    for (let i = 0; i < 40 && !fs.existsSync(outC); i++) await new Promise(r => setTimeout(r, 250));
-    if (!fs.existsSync(outC)) throw new Error('PDF wurde nicht erzeugt – ggf. in PowerPoint „Zugriff gewähren“ bestätigen und erneut öffnen.');
-    fs.copyFileSync(outC, outF);
+    const out = await run('osascript', [as, docName, docBase, ...targets], 300000);
+    if (out && String(out).trim()) logLine(short + '-Export: ' + String(out).trim().replace(/\n/g, ' | '));
+    let hit = null;
+    for (let i = 0; i < 40 && !hit; i++) {
+      for (const f of targets) {
+        try { const b = fs.readFileSync(f); if (b.length > 100 && b.slice(0, 4).toString() === '%PDF') { hit = f; fs.writeFileSync(outF, b); break; } } catch (e) {}
+      }
+      if (!hit) await new Promise(r => setTimeout(r, 250));
+    }
+    for (const f of targets) {
+      let st = 'fehlt';
+      try { fs.accessSync(f, fs.constants.R_OK); st = 'lesbar'; } catch (e) { if (e.code !== 'ENOENT') st = e.code; }
+      logLine('  Ziel ' + f + ': ' + st + (f === hit ? ' ← benutzt' : ''));
+    }
+    if (!hit) throw new Error('PDF wurde nicht erzeugt (alle Ablageorte geprüft, siehe Protokoll)');
   } finally {
-    for (const f of [inF, outC]) fs.rm(f, { force: true }, () => {});
+    for (const f of [inF, ...targets]) fs.rm(f, { force: true }, () => {});
     setTimeout(() => { if (win && !win.isDestroyed()) win.focus(); }, 300);
   }
+}
+/* Ersatz ohne PowerPoint: macOS-Vorschau (Quick Look) erzeugt eine Vorschau der Präsentation */
+async function macQuickLook(srcFile, outF) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cuestack-ql-'));
+  try {
+    await run('qlmanage', ['-p', '-o', dir, srcFile], 120000);
+    const ql = fs.readdirSync(dir).find(n => n.endsWith('.qlpreview'));
+    if (!ql) throw new Error('Quick Look hat keine Vorschau erzeugt');
+    const qd = path.join(dir, ql);
+    const pdf = path.join(qd, 'Preview.pdf');
+    if (fs.existsSync(pdf)) { fs.copyFileSync(pdf, outF); return; }
+    const html = fs.readdirSync(qd).find(n => /^Preview\.html?$/i.test(n));
+    if (!html) throw new Error('Quick Look: weder PDF noch HTML in der Vorschau');
+    const w = new BrowserWindow({ show: false, width: 1280, height: 720, webPreferences: { offscreen: false, javascript: false } });
+    try {
+      await w.loadFile(path.join(qd, html));
+      await new Promise(r => setTimeout(r, 1500));
+      const data = await w.webContents.printToPDF({ landscape: true, printBackground: true, pageSize: { width: 13.333, height: 7.5 }, margins: { marginType: 'none' } });
+      fs.writeFileSync(outF, data);
+    } finally { w.destroy(); }
+  } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 }
 /* Protokoll für Fehler, damit nichts unbemerkt verschwindet */
 function logLine(msg) {
@@ -467,8 +528,10 @@ ipcMain.handle('convert-office', async (_e, { name, buf }) => {
     const so = findSoffice();
     if (so) via = await tryIt('LibreOffice', () => run(so, ['--headless', '--convert-to', 'pdf', '--outdir', dir, inF]));
   }
+  if (!via && process.platform === 'darwin' && /\.(pptx?|ppsx?|key|docx?|xlsx?)$/.test(ext)) via = await tryIt('macOS-Vorschau', () => macQuickLook(inF, outF));
   try {
     if (!via) logLine('Umwandlung ' + name + ' fehlgeschlagen: ' + errors.join(' | '));
+    else logLine('Umwandlung ' + name + ' ok über ' + via + (errors.length ? ' (vorher: ' + errors.join(' | ') + ')' : ''));
     if (!via) return { error: errors.length ? errors.join(' | ') : 'Kein Programm zum Umwandeln gefunden. Bitte Microsoft PowerPoint, Keynote oder LibreOffice installieren (LibreOffice ist kostenlos). Auf dem Mac beim ersten Mal die Rückfragen „CueStack möchte … steuern“ bzw. „auf Daten anderer Apps zugreifen“ erlauben.' };
     return { pdf: fs.readFileSync(outF), via };
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
@@ -739,6 +802,91 @@ function startHttp() {
   srv.on('error', (e) => console.error('HTTP-API:', e.message));
   srv.listen(PORT, HOST);
 }
+
+/* ---------- Updates direkt aus GitHub-Releases ---------- */
+const https = require('https');
+const REPO = 'SSTGame/cuestack';
+function httpsGet(url, { json = false, file = null, onProgress = null } = {}, hops = 0) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'CueStack/' + app.getVersion(), Accept: json ? 'application/vnd.github+json' : 'application/octet-stream' } }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && hops < 8) {
+        res.resume(); return resolve(httpsGet(new URL(res.headers.location, url).toString(), { json, file, onProgress }, hops + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+      const total = Number(res.headers['content-length']) || 0;
+      let got = 0, last = 0;
+      if (file) {
+        const out = fs.createWriteStream(file);
+        res.on('data', (c) => { got += c.length; const n = Date.now(); if (onProgress && n - last > 200) { last = n; onProgress(got, total); } });
+        res.pipe(out);
+        out.on('finish', () => out.close(() => resolve(file)));
+        out.on('error', reject); res.on('error', reject);
+      } else {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => { const t = Buffer.concat(chunks).toString('utf8'); try { resolve(json ? JSON.parse(t) : t); } catch (e) { reject(e); } });
+        res.on('error', reject);
+      }
+    });
+    req.setTimeout(30000, () => req.destroy(new Error('Zeitüberschreitung')));
+    req.on('error', reject);
+  });
+}
+function verCmp(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map(Number), pb = String(b).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; }
+  return 0;
+}
+let updInfo = null;
+ipcMain.handle('update-check', async () => {
+  try {
+    const r = await httpsGet(`https://api.github.com/repos/${REPO}/releases/latest`, { json: true });
+    const re = process.platform === 'darwin' ? /Mac.*\.zip$/i : process.platform === 'win32' ? /Setup.*\.exe$/i : null;
+    const asset = re && (r.assets || []).find(a => re.test(a.name));
+    const latest = String(r.tag_name || '').replace(/^v/, '');
+    updInfo = { current: app.getVersion(), latest, newer: !!latest && verCmp(latest, app.getVersion()) > 0, url: asset && asset.browser_download_url, size: asset && asset.size, asset: asset && asset.name, notes: String(r.body || '').slice(0, 2000), page: r.html_url };
+    if (updInfo.newer && !asset) updInfo.error = process.platform === 'darwin' ? 'Für diese Version gibt es noch kein Mac-Update-Paket – bitte einmal die DMG von der Release-Seite installieren.' : 'Kein Update-Paket für dieses System gefunden.';
+    return updInfo;
+  } catch (e) { return { current: app.getVersion(), error: 'Update-Prüfung fehlgeschlagen: ' + e.message }; }
+});
+ipcMain.handle('update-install', async () => {
+  const send = (m) => { if (win && !win.isDestroyed()) win.webContents.send('update-progress', m); };
+  try {
+    if (!updInfo || !updInfo.url) throw new Error('Kein Update gefunden');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cuestack-update-'));
+    const file = path.join(dir, updInfo.asset);
+    await httpsGet(updInfo.url, { file, onProgress: (g, t) => send({ phase: 'download', got: g, total: t || updInfo.size || 0 }) });
+    send({ phase: 'install' });
+    logLine('Update ' + updInfo.current + ' → ' + updInfo.latest + ' geladen: ' + file);
+    if (process.platform === 'darwin') {
+      const appPath = path.resolve(process.execPath, '../../..');           // …/CueStack.app
+      if (!/\.app$/.test(appPath)) throw new Error('App-Pfad nicht erkannt: ' + appPath);
+      const ex = path.join(dir, 'x'); fs.mkdirSync(ex);
+      await run('ditto', ['-x', '-k', file, ex], 300000);
+      const newApp = fs.readdirSync(ex).find(n => n.endsWith('.app'));
+      if (!newApp) throw new Error('Im Update-Paket ist keine App');
+      try { fs.accessSync(path.dirname(appPath), fs.constants.W_OK); } catch (e) { throw new Error('Keine Schreibrechte für ' + path.dirname(appPath) + ' – bitte die DMG manuell installieren.'); }
+      const sh = path.join(dir, 'update.sh');
+      fs.writeFileSync(sh, `#!/bin/sh
+while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done
+sleep 0.5
+rm -rf "${appPath}.old"
+mv "${appPath}" "${appPath}.old" || exit 1
+if ditto "${path.join(ex, newApp)}" "${appPath}"; then rm -rf "${appPath}.old"; else rm -rf "${appPath}"; mv "${appPath}.old" "${appPath}"; fi
+xattr -cr "${appPath}" 2>/dev/null
+open "${appPath}"
+rm -rf "${dir}"
+`, { mode: 0o755 });
+      spawn('/bin/sh', [sh], { detached: true, stdio: 'ignore' }).unref();
+    } else if (process.platform === 'win32') {
+      const cmd = path.join(dir, 'update.cmd');
+      fs.writeFileSync(cmd, `@echo off\r\n:w\r\ntasklist /FI "PID eq ${process.pid}" | find "${process.pid}" >nul && (timeout /t 1 /nobreak >nul & goto w)\r\n"${file}" /S\r\nstart "" "${process.execPath}"\r\n`);
+      spawn('cmd.exe', ['/c', cmd], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    } else throw new Error('Auf diesem System nicht unterstützt');
+    setTimeout(() => app.quit(), 400);
+    return { ok: true };
+  } catch (e) { logLine('Update fehlgeschlagen: ' + e.message); send({ phase: 'error', error: e.message }); return { error: e.message }; }
+});
 
 app.whenReady().then(() => {
   setupCapture();

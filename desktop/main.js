@@ -230,14 +230,27 @@ const MAC_EXPORT = {
   set outPath to item 3 of argv
   tell application "Microsoft PowerPoint"
     set thePres to missing value
-    repeat 240 times
-      repeat with oneItem in presentations
-        set itemName to name of oneItem
-        if itemName is docName or itemName is docBase then set thePres to contents of oneItem
+    repeat 60 times
+      try
+        set nameList to name of every presentation
+      on error
+        set nameList to {}
+      end try
+      repeat with idx from 1 to count of nameList
+        set oneName to (item idx of nameList) as text
+        if oneName is docName or oneName is docBase then
+          set thePres to presentation idx
+          exit repeat
+        end if
       end repeat
       if thePres is not missing value then exit repeat
       delay 0.5
     end repeat
+    if thePres is missing value then
+      try
+        if (count of presentations) > 0 then set thePres to active presentation
+      end try
+    end if
     if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
     try
@@ -254,14 +267,27 @@ end run`,
   set outPath to item 3 of argv
   tell application "Microsoft Word"
     set theDoc to missing value
-    repeat 240 times
-      repeat with oneItem in documents
-        set itemName to name of oneItem
-        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
+    repeat 60 times
+      try
+        set nameList to name of every document
+      on error
+        set nameList to {}
+      end try
+      repeat with idx from 1 to count of nameList
+        set oneName to (item idx of nameList) as text
+        if oneName is docName or oneName is docBase then
+          set theDoc to document idx
+          exit repeat
+        end if
       end repeat
       if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
+    if theDoc is missing value then
+      try
+        if (count of documents) > 0 then set theDoc to active document
+      end try
+    end if
     if theDoc is missing value then error "Word hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
     save as theDoc file name outPath file format format PDF
@@ -275,14 +301,27 @@ for (const a of ['Keynote', 'Pages', 'Numbers']) MAC_EXPORT[a] = `on run argv
   set outPath to item 3 of argv
   tell application "${a}"
     set theDoc to missing value
-    repeat 240 times
-      repeat with oneItem in documents
-        set itemName to name of oneItem
-        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
+    repeat 60 times
+      try
+        set nameList to name of every document
+      on error
+        set nameList to {}
+      end try
+      repeat with idx from 1 to count of nameList
+        set oneName to (item idx of nameList) as text
+        if oneName is docName or oneName is docBase then
+          set theDoc to document idx
+          exit repeat
+        end if
       end repeat
       if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
+    if theDoc is missing value then
+      try
+        if (count of documents) > 0 then set theDoc to front document
+      end try
+    end if
     if theDoc is missing value then error "${a} hat die Datei nicht geöffnet (Zeitüberschreitung)."
     export theDoc to (POSIX file outPath) as PDF
     close theDoc saving no
@@ -507,14 +546,27 @@ const MAC_LIVE = {
   set docBase to item 2 of argv
   tell application "Microsoft PowerPoint"
     set thePres to missing value
-    repeat 240 times
-      repeat with oneItem in presentations
-        set itemName to name of oneItem
-        if itemName is docName or itemName is docBase then set thePres to contents of oneItem
+    repeat 60 times
+      try
+        set nameList to name of every presentation
+      on error
+        set nameList to {}
+      end try
+      repeat with idx from 1 to count of nameList
+        set oneName to (item idx of nameList) as text
+        if oneName is docName or oneName is docBase then
+          set thePres to presentation idx
+          exit repeat
+        end if
       end repeat
       if thePres is not missing value then exit repeat
       delay 0.5
     end repeat
+    if thePres is missing value then
+      try
+        if (count of presentations) > 0 then set thePres to active presentation
+      end try
+    end if
     if thePres is missing value then error "PowerPoint hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
     set showSettings to slide show settings of thePres
@@ -548,14 +600,27 @@ end tell`,
   set docBase to item 2 of argv
   tell application "Keynote"
     set theDoc to missing value
-    repeat 240 times
-      repeat with oneItem in documents
-        set itemName to name of oneItem
-        if itemName is docName or itemName is docBase then set theDoc to contents of oneItem
+    repeat 60 times
+      try
+        set nameList to name of every document
+      on error
+        set nameList to {}
+      end try
+      repeat with idx from 1 to count of nameList
+        set oneName to (item idx of nameList) as text
+        if oneName is docName or oneName is docBase then
+          set theDoc to document idx
+          exit repeat
+        end if
       end repeat
       if theDoc is not missing value then exit repeat
       delay 0.5
     end repeat
+    if theDoc is missing value then
+      try
+        if (count of documents) > 0 then set theDoc to front document
+      end try
+    end if
     if theDoc is missing value then error "Keynote hat die Datei nicht geöffnet (Zeitüberschreitung)."
     activate
     start theDoc from slide 1 of theDoc
